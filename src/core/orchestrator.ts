@@ -92,7 +92,13 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       depth: req.depth,
       onChunk: req.onChunk,
     });
-    const outcome = classify(result, cfg.limitPatterns);
+    // CLIs such as codex echo the prompt; remove it so our own handoff wording
+    // ("hit a usage/rate limit") is never mistaken for a limit error.
+    const scrub = (s: string) => s.split(prompt).join("");
+    const outcome = classify(
+      { ...result, stdout: scrub(result.stdout), stderr: scrub(result.stderr) },
+      cfg.limitPatterns,
+    );
     if (outcome === "limited") state.setCooldown(agent, now() + cfg.defaultCooldownSec * 1000);
     const attempt: Attempt = { agent, outcome, exitCode: result.exitCode, stderr: result.stderr };
     return { result, outcome, attempt };

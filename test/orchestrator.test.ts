@@ -94,6 +94,22 @@ describe("runTask", () => {
     expect(r.failedOver).toBe(false);
   });
 
+  it("does not treat an echoed handoff prompt as a rate limit", async () => {
+    // Real CLIs (codex) echo the prompt to stderr; the handoff text itself says "rate limit".
+    const dir = mkdtempSync(join(tmpdir(), "orch-"));
+    const state = new StateStore(join(dir, "state.json"));
+    const run: RunFn = async (command, _args, prompt) =>
+      command === "claude"
+        ? LIMIT
+        : { exitCode: 1, stdout: "", stderr: `user\n${prompt}\nERROR: model not supported` };
+    const r = await runTask(
+      { config: noSummaryConfig(), state, run, now: () => 1_000_000 },
+      { prompt: "task", cwd: dir, depth: 0 },
+    );
+    expect(r.attempts[1].outcome).toBe("failed");
+    expect(state.isCooling("codex", 1_000_000)).toBe(false);
+  });
+
   it("rejects recursion", async () => {
     const h = harness({ claude: [], codex: [] });
     const r = await runTask(h.deps, { prompt: "task", cwd: h.cwd, depth: 1 });
