@@ -43,7 +43,7 @@ orch/
   src/daemon/   unix socket server at ~/.orch/sock, calls core
   src/cli/      `orch` command, thin client of the daemon
   src/mcp/      MCP server (stdio), thin client of the daemon
-  config.yaml   routing rules, agent commands, rate-limit patterns
+  config.example.yaml   sample config (real file: ~/.orch/config.yaml)
 ```
 
 `core` is a plain library so it can also run without the daemon (single-shot
@@ -84,10 +84,7 @@ CLI mode) with no code changes.
 - At most one failover per task, to prevent ping-pong.
 - Recursion guard: orch sets `ORCH_DEPTH`; a call made with `ORCH_DEPTH >= 1`
   is rejected, since a spawned agent could otherwise call orch again.
-- Non-limit failures (e.g. task error, bad prompt) are returned as-is and
-  do not trigger failover or cooldown.
-- Unknown stderr on non-zero exit: treat as failure, fail over once, log the
-  stderr so patterns can be added.
+- Any non-zero exit or spawn error fails over once; only a rate-limit pattern match sets a cooldown. Unknown stderr is returned in the attempt record so patterns can be added.
 
 ## Testing
 
@@ -96,8 +93,6 @@ CLI mode) with no code changes.
   CLI calls in automated tests.
 - Manual smoke test with the real `claude` and `codex` once per release.
 
-## Open items for planning
+## Resolved in the plan
 
-- Exact headless flags for each CLI (`claude -p`, `codex exec`) and how to
-  pass the working directory and permission mode.
-- Whether the daemon is started on demand by the first client or by launchd.
+Headless flags are config-driven and verified against the real CLIs (`claude -p`/`-c`, `codex exec`/`exec resume --last`). The daemon starts on demand from the first client; launchd is a later option.
