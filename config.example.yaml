@@ -1,0 +1,18 @@
+# Copy to ~/.orch/config.yaml. Restart the daemon (`orch daemon stop`) after editing.
+defaultAgent: claude
+agents:
+  claude:
+    command: claude
+    args: ["-p", "{prompt}"]            # add permission flags here if you want them
+    summaryArgs: ["-c", "-p", "{prompt}"]
+    defaultCooldownSec: 3600
+  codex:
+    command: codex
+    args: ["exec", "{prompt}"]
+    summaryArgs: ["exec", "resume", "--last", "{prompt}"]
+    defaultCooldownSec: 3600
+rules:
+  - match: "refactor|architecture|migrate|redesign"
+    agent: claude
+  - match: "typo|rename|quick|small fix|one-liner"
+    agent: codex
