@@ -3,13 +3,13 @@ defaultAgent: claude
 agents:
   claude:
     command: claude
-    args: ["-p", "{prompt}"]            # add permission flags here if you want them
-    summaryArgs: ["-c", "-p", "{prompt}"]
+    args: ["-p", "--", "{prompt}"]      # "--" keeps a prompt starting with "-" from being read as a flag
+    summaryArgs: ["-c", "-p", "--", "{prompt}"]
     defaultCooldownSec: 3600
   codex:
     command: codex
-    args: ["exec", "{prompt}"]
-    summaryArgs: ["exec", "resume", "--last", "{prompt}"]
+    args: ["exec", "--", "{prompt}"]
+    summaryArgs: ["exec", "resume", "--last", "--", "{prompt}"]
     defaultCooldownSec: 3600
 rules:
   - match: "refactor|architecture|migrate|redesign"

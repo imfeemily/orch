@@ -38,6 +38,9 @@ args = ["/absolute/path/to/orch/dist/mcp/index.js"]
 
 ## Notes
 
+- Codex's MCP tool timeout is short by default; for long tasks raise `tool_timeout_sec` for the `orch` server in `~/.codex/config.toml`. Cancelling a call stops the running agent.
+- Codex may start MCP servers with a restricted environment, so the recursion guard (`ORCH_DEPTH`) is guaranteed for the `orch` CLI but not verified for the MCP path from Codex.
+
 - Permission/sandbox flags for each agent go in `args` in `~/.orch/config.yaml`.
 - Rate-limit detection is regex-based (`limitPatterns`); add patterns if a real limit error is not detected (check `orch status`: a limit shows as a cooldown, a plain failure does not).
 - A spawned agent that calls `orch` again is rejected via `ORCH_DEPTH`.

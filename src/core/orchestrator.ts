@@ -16,6 +16,7 @@ export interface TaskRequest {
   cwd: string;
   depth: number;
   onChunk?: (text: string) => void;
+  signal?: AbortSignal;
 }
 
 const SUMMARY_PROMPT =
@@ -91,6 +92,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       cwd: req.cwd,
       depth: req.depth,
       onChunk: req.onChunk,
+      signal: req.signal,
     });
     // CLIs such as codex echo the prompt; remove it so our own handoff wording
     // ("hit a usage/rate limit") is never mistaken for a limit error.
@@ -112,6 +114,17 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       output: a1.result.stdout,
       failedOver: false,
       attempts: [a1.attempt],
+    });
+  }
+
+  if (req.signal?.aborted) {
+    return record({
+      status: "failed",
+      agent: first,
+      output: a1.result.stdout,
+      failedOver: false,
+      attempts: [a1.attempt],
+      message: "aborted by caller",
     });
   }
 

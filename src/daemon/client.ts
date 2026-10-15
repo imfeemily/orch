@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import net from "node:net";
 import { fileURLToPath } from "node:url";
+import { loadConfig } from "../core/config.js";
 import type { Message, Request } from "./protocol.js";
 
 export function isAlive(sockPath: string): Promise<boolean> {
@@ -53,6 +54,7 @@ export function sendRequest(
 
 export async function connectOrStart(sockPath: string, timeoutMs = 5000): Promise<void> {
   if (await isAlive(sockPath)) return;
+  loadConfig(); // throws a readable error here instead of a silent daemon crash
   const entry = fileURLToPath(new URL("./index.js", import.meta.url));
   spawn(process.execPath, [entry], { detached: true, stdio: "ignore" }).unref();
   const deadline = Date.now() + timeoutMs;

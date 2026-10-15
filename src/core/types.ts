@@ -35,6 +35,7 @@ export interface RunOptions {
   depth: number;
   onChunk?: (text: string) => void;
   timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 export type RunFn = (

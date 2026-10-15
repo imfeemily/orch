@@ -110,6 +110,25 @@ describe("runTask", () => {
     expect(state.isCooling("codex", 1_000_000)).toBe(false);
   });
 
+  it("does not fail over after the caller aborted", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "orch-"));
+    const state = new StateStore(join(dir, "state.json"));
+    const ac = new AbortController();
+    const calls: string[] = [];
+    const run: RunFn = async (command) => {
+      calls.push(command);
+      ac.abort();
+      return LIMIT;
+    };
+    const r = await runTask(
+      { config: noSummaryConfig(), state, run, now: () => 1_000_000 },
+      { prompt: "task", cwd: dir, depth: 0, signal: ac.signal },
+    );
+    expect(calls).toEqual(["claude"]);
+    expect(r.status).toBe("failed");
+    expect(r.message).toContain("aborted");
+  });
+
   it("rejects recursion", async () => {
     const h = harness({ claude: [], codex: [] });
     const r = await runTask(h.deps, { prompt: "task", cwd: h.cwd, depth: 1 });

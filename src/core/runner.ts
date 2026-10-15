@@ -32,6 +32,13 @@ export const runCommand: RunFn = (command, args, prompt, opts) =>
       }, opts.timeoutMs);
     }
 
+    const onAbort = () => {
+      child.kill("SIGKILL");
+      finish({ exitCode: null, stdout, stderr: `${stderr}\norch: aborted` });
+    };
+    if (opts.signal?.aborted) onAbort();
+    else opts.signal?.addEventListener("abort", onAbort, { once: true });
+
     child.stdout.on("data", (b: Buffer) => {
       const text = b.toString();
       stdout += text;

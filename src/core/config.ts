@@ -20,15 +20,15 @@ export const DEFAULT_CONFIG: Config = {
   agents: {
     claude: {
       command: "claude",
-      args: ["-p", "{prompt}"],
-      summaryArgs: ["-c", "-p", "{prompt}"],
+      args: ["-p", "--", "{prompt}"],
+      summaryArgs: ["-c", "-p", "--", "{prompt}"],
       limitPatterns: LIMIT_PATTERNS,
       defaultCooldownSec: 3600,
     },
     codex: {
       command: "codex",
-      args: ["exec", "{prompt}"],
-      summaryArgs: ["exec", "resume", "--last", "{prompt}"],
+      args: ["exec", "--", "{prompt}"],
+      summaryArgs: ["exec", "resume", "--last", "--", "{prompt}"],
       limitPatterns: LIMIT_PATTERNS,
       defaultCooldownSec: 3600,
     },

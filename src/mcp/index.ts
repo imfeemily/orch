@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -23,7 +23,7 @@ server.tool(
     const depth = Number(process.env.ORCH_DEPTH ?? 0) || 0;
     const final = await sendRequest(
       sock,
-      { type: "run", prompt, cwd: cwd ?? process.cwd(), depth },
+      { type: "run", prompt, cwd: resolve(cwd ?? process.cwd()), depth },
       () => {},
     );
     if (final.type === "error") return text(final.message, true);

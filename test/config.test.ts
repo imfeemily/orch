@@ -26,6 +26,15 @@ describe("loadConfig", () => {
     expect(cfg.agents.codex).toEqual(DEFAULT_CONFIG.agents.codex);
   });
 
+  it("passes the prompt after -- so a leading dash is not parsed as a flag", () => {
+    for (const name of ["claude", "codex"] as const) {
+      const a = DEFAULT_CONFIG.agents[name];
+      for (const args of [a.args, a.summaryArgs!]) {
+        expect(args[args.indexOf("{prompt}") - 1]).toBe("--");
+      }
+    }
+  });
+
   it("rejects an unknown defaultAgent", () => {
     expect(() => loadConfig(tmpFile("defaultAgent: gemini\n"))).toThrow(/defaultAgent/);
   });

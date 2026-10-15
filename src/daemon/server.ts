@@ -1,6 +1,6 @@
-import { chmodSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, statSync, unlinkSync } from "node:fs";
 import net from "node:net";
-import { dirname } from "node:path";
+import { dirname, isAbsolute } from "node:path";
 import { type Deps, runTask } from "../core/orchestrator.js";
 import { isAlive } from "./client.js";
 import type { Message, Request } from "./protocol.js";
@@ -9,6 +9,14 @@ export interface DaemonOptions {
   sockPath: string;
   deps: Deps;
   onShutdown?: () => void;
+}
+
+function isDirectory(p: string): boolean {
+  try {
+    return statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promise<void> }> {
@@ -20,7 +28,7 @@ export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promi
     unlinkSync(sockPath); // stale socket from a crashed daemon
   }
 
-  const handle = async (socket: net.Socket, line: string) => {
+  const handle = async (socket: net.Socket, line: string, signal: AbortSignal) => {
     const send = (m: Message) => {
       if (!socket.destroyed) socket.write(`${JSON.stringify(m)}\n`);
     };
@@ -42,11 +50,16 @@ export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promi
         send({ type: "error", message: "run requires string prompt and cwd" });
         return;
       }
+      if (!isAbsolute(req.cwd) || !isDirectory(req.cwd)) {
+        send({ type: "error", message: `cwd must be an existing absolute directory: ${req.cwd}` });
+        return;
+      }
       try {
         const result = await runTask(deps, {
           prompt: req.prompt,
           cwd: req.cwd,
           depth: Number(req.depth) || 0,
+          signal,
           onChunk: (text) => send({ type: "chunk", text }),
         });
         send({ type: "result", result });
@@ -59,6 +72,8 @@ export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promi
   };
 
   const server = net.createServer((socket) => {
+    const ac = new AbortController();
+    socket.on("close", () => ac.abort());
     let buf = "";
     socket.on("data", (d) => {
       buf += d.toString();
@@ -66,7 +81,7 @@ export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promi
       while ((i = buf.indexOf("\n")) >= 0) {
         const line = buf.slice(0, i);
         buf = buf.slice(i + 1);
-        if (line.trim()) void handle(socket, line);
+        if (line.trim()) void handle(socket, line, ac.signal);
       }
     });
     socket.on("error", () => {});

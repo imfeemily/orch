@@ -47,6 +47,14 @@ describe("runCommand", () => {
     expect(r.stderr).toContain("timed out");
   });
 
+  it("kills the process when the signal aborts", async () => {
+    const ac = new AbortController();
+    setTimeout(() => ac.abort(), 150);
+    const r = await runCommand(node, [FAKE, "sleep"], "", { ...base, signal: ac.signal });
+    expect(r.exitCode).toBeNull();
+    expect(r.stderr).toContain("aborted");
+  });
+
   it("streams stdout chunks to onChunk", async () => {
     const chunks: string[] = [];
     await runCommand(node, [FAKE, "ok", "x"], "", { ...base, onChunk: (t) => chunks.push(t) });
