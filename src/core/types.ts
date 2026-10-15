@@ -1,5 +1,5 @@
 export type AgentName = "claude" | "codex";
-export type Outcome = "ok" | "limited" | "failed";
+export type Outcome = "ok" | "limited" | "auth" | "failed";
 
 export interface AgentConfig {
   command: string;
@@ -9,6 +9,8 @@ export interface AgentConfig {
   summaryArgs?: string[];
   /** case-insensitive regexes matched against stderr+stdout of a non-zero exit */
   limitPatterns: string[];
+  /** case-insensitive regexes that mean "not logged in" (checked after limitPatterns) */
+  authPatterns: string[];
   defaultCooldownSec: number;
 }
 

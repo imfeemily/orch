@@ -46,6 +46,12 @@ describe("loadConfig", () => {
     ).toThrow(/not a valid regex/);
   });
 
+  it("rejects an invalid auth pattern", () => {
+    expect(() =>
+      loadConfig(tmpFile('agents:\n  claude:\n    authPatterns: ["("]\n')),
+    ).toThrow(/not a valid regex/);
+  });
+
   it("rejects an invalid limit pattern", () => {
     expect(() =>
       loadConfig(tmpFile('agents:\n  codex:\n    limitPatterns: ["("]\n')),

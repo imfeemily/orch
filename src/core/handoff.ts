@@ -4,13 +4,14 @@ import type { AgentName } from "./types.js";
 
 const exec = promisify(execFile);
 
-export const MAX_DIFF_CHARS = 20_000;
+/** Diffs up to this size are inlined; larger ones are summarised with `git diff --stat`. */
+export const INLINE_DIFF_MAX_CHARS = 4_000;
 
 export interface HandoffInput {
   prompt: string;
   cwd: string;
   previousAgent: AgentName;
-  reason: "limited" | "failed";
+  reason: "limited" | "auth" | "failed";
   summary?: string;
 }
 
@@ -23,18 +24,13 @@ async function git(cwd: string, args: string[]): Promise<string | null> {
   }
 }
 
-function truncate(text: string): string {
-  if (text.length <= MAX_DIFF_CHARS) return text;
-  const dropped = text.length - MAX_DIFF_CHARS;
-  return `${text.slice(0, MAX_DIFF_CHARS)}\n... [diff truncated, ${dropped} more chars]`;
-}
-
 export async function buildHandoff(input: HandoffInput): Promise<string> {
   const { prompt, cwd, previousAgent, reason, summary } = input;
   const status = await git(cwd, ["status", "--short"]);
   const diff = (await git(cwd, ["diff", "HEAD"])) ?? (await git(cwd, ["diff"])) ?? "";
 
-  const why = reason === "limited" ? "hit a usage/rate limit" : "failed";
+  const why =
+    reason === "limited" ? "hit a usage/rate limit" : reason === "auth" ? "could not authenticate" : "failed";
   const parts: string[] = [
     `You are continuing a task started by another coding agent (${previousAgent}), which stopped because it ${why}.`,
     `## Original task\n${prompt}`,
@@ -46,7 +42,16 @@ export async function buildHandoff(input: HandoffInput): Promise<string> {
     );
   } else {
     parts.push(`## Working tree status\n${status.trim() === "" ? "(clean)" : status.trimEnd()}`);
-    parts.push(`## Diff so far\n${diff.trim() === "" ? "(no changes)" : truncate(diff)}`);
+    if (diff.trim() === "") {
+      parts.push("## Diff so far\n(no changes)");
+    } else if (diff.length <= INLINE_DIFF_MAX_CHARS) {
+      parts.push(`## Diff so far\n${diff}`);
+    } else {
+      const stat = (await git(cwd, ["diff", "HEAD", "--stat"])) ?? (await git(cwd, ["diff", "--stat"])) ?? "";
+      parts.push(
+        `## Changes so far (diff too large to inline: ${diff.length} chars)\n${stat.trimEnd()}\n\nRun \`git diff\` to inspect the changes.`,
+      );
+    }
   }
 
   if (summary) parts.push(`## Summary from previous agent\n${summary}`);

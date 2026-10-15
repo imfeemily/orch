@@ -56,9 +56,17 @@ Tools exposed: `orch_run({ prompt, cwd? })` and `orch_status()`.
    An agent in cooldown is skipped.
 2. **Run**: the agent is started headless (`claude -p`, `codex exec`) in the target directory.
 3. **Fail over once**: on a non-zero exit, orch hands the task to the other agent.
-   Only a rate-limit match (see `limitPatterns`) puts the first agent on cooldown
-   (`defaultCooldownSec`, 1 hour by default).
-4. **Guard**: an agent started by orch cannot call orch again (`ORCH_DEPTH`).
+   Only a rate-limit match (see `limitPatterns`) puts the first agent on cooldown.
+   If the limit message says when it resets (for example "try again at 10:05 PM"),
+   that time is used; otherwise `defaultCooldownSec` (1 hour by default).
+   A "not logged in" error (see `authPatterns`) is reported with the fix
+   (`claude` then `/login`, or `codex login`) and does not set a cooldown.
+4. **Hand over cheaply**: the second agent gets the original prompt plus
+   `git status`; the diff is inlined only when small (4000 chars), otherwise
+   just `git diff --stat` and the agent reads files itself. A summary from the
+   first agent is requested only after a plain failure, never after a limit or
+   login error (a resumed session cannot answer then).
+5. **Guard**: an agent started by orch cannot call orch again (`ORCH_DEPTH`).
    Cancelling the call stops the running agent.
 
 ## Configuration (`~/.orch/config.yaml`)
@@ -84,8 +92,8 @@ rules:
 ```
 
 - Add permission or sandbox flags for an agent to its `args`.
-- `limitPatterns` (regexes matched against stderr and the last 20 lines of stdout)
-  can be overridden per agent if a real limit error is not detected.
+- `limitPatterns` and `authPatterns` (regexes matched against stderr and the last
+  20 lines of stdout) can be overridden per agent if a real error is not detected.
 - Remove `summaryArgs` to disable the handoff summary.
 
 ## Troubleshooting

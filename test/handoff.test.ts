@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MAX_DIFF_CHARS, buildHandoff } from "../src/core/handoff.js";
+import { INLINE_DIFF_MAX_CHARS, buildHandoff } from "../src/core/handoff.js";
 
 function gitRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), "orch-git-"));
@@ -39,12 +39,20 @@ describe("buildHandoff", () => {
     expect(out).toContain("p");
   });
 
-  it("truncates a huge diff", async () => {
+  it("lists changed files instead of inlining a large diff", async () => {
     const dir = gitRepo();
-    writeFileSync(join(dir, "a.txt"), "x".repeat(MAX_DIFF_CHARS * 3) + "\n");
+    writeFileSync(join(dir, "a.txt"), "x".repeat(INLINE_DIFF_MAX_CHARS * 3) + "\n");
     const out = await buildHandoff({ prompt: "p", cwd: dir, previousAgent: "claude", reason: "limited" });
-    expect(out).toContain("diff truncated");
-    expect(out.length).toBeLessThan(MAX_DIFF_CHARS + 2000);
+    expect(out).toContain("diff too large to inline");
+    expect(out).toContain("a.txt |");
+    expect(out).not.toContain("x".repeat(500));
+    expect(out.length).toBeLessThan(INLINE_DIFF_MAX_CHARS);
+  });
+
+  it("explains an auth failure in the handoff", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "orch-nogit-"));
+    const out = await buildHandoff({ prompt: "p", cwd: dir, previousAgent: "claude", reason: "auth" });
+    expect(out).toContain("could not authenticate");
   });
 
   it("includes a summary when provided", async () => {

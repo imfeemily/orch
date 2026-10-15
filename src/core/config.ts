@@ -15,6 +15,16 @@ const LIMIT_PATTERNS = [
   "overloaded",
 ];
 
+const AUTH_PATTERNS = [
+  "failed to authenticate",
+  "oauth session expired",
+  "not logged in",
+  "please run /login",
+  "invalid api key",
+  "could not be refreshed",
+  "sign in again",
+];
+
 export const DEFAULT_CONFIG: Config = {
   defaultAgent: "claude",
   agents: {
@@ -23,6 +33,7 @@ export const DEFAULT_CONFIG: Config = {
       args: ["-p", "--", "{prompt}"],
       summaryArgs: ["-c", "-p", "--", "{prompt}"],
       limitPatterns: LIMIT_PATTERNS,
+      authPatterns: AUTH_PATTERNS,
       defaultCooldownSec: 3600,
     },
     codex: {
@@ -30,6 +41,7 @@ export const DEFAULT_CONFIG: Config = {
       args: ["exec", "--", "{prompt}"],
       summaryArgs: ["exec", "resume", "--last", "--", "{prompt}"],
       limitPatterns: LIMIT_PATTERNS,
+      authPatterns: AUTH_PATTERNS,
       defaultCooldownSec: 3600,
     },
   },
@@ -79,6 +91,7 @@ function validate(cfg: Config): void {
   }
   for (const name of AGENT_NAMES) {
     cfg.agents[name].limitPatterns.forEach(assertRegex);
+    cfg.agents[name].authPatterns.forEach(assertRegex);
   }
 }
 

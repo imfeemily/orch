@@ -129,6 +129,34 @@ describe("runTask", () => {
     expect(r.message).toContain("aborted");
   });
 
+  it("uses the reset time from the limit message as the cooldown", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "orch-"));
+    const state = new StateStore(join(dir, "state.json"));
+    const msg = "You've hit your usage limit. Try again at 10:05 PM.";
+    const run: RunFn = async (command) =>
+      command === "claude" ? { exitCode: 1, stdout: "", stderr: msg } : OK();
+    const now = new Date(2026, 9, 15, 18, 0).getTime();
+    await runTask(
+      { config: noSummaryConfig(), state, run, now: () => now },
+      { prompt: "task", cwd: dir, depth: 0 },
+    );
+    expect(state.cooldownUntil("claude")).toBe(new Date(2026, 9, 15, 22, 5).getTime());
+  });
+
+  it("classifies an expired login as auth and tells the user how to fix it", async () => {
+    const AUTH: RunResult = {
+      exitCode: 1,
+      stdout: "Failed to authenticate: OAuth session expired and could not be refreshed\n",
+      stderr: "",
+    };
+    const h = harness({ claude: [AUTH], codex: [FAIL] });
+    const r = await runTask(h.deps, { prompt: "task", cwd: h.cwd, depth: 0 });
+    expect(r.attempts[0].outcome).toBe("auth");
+    expect(r.status).toBe("failed");
+    expect(r.message).toContain("/login");
+    expect(h.state.isCooling("claude", 1_000_000)).toBe(false);
+  });
+
   it("rejects recursion", async () => {
     const h = harness({ claude: [], codex: [] });
     const r = await runTask(h.deps, { prompt: "task", cwd: h.cwd, depth: 1 });

@@ -1,5 +1,6 @@
-import { classify } from "./detector.js";
+import { classify, relevantText } from "./detector.js";
 import { buildHandoff } from "./handoff.js";
+import { parseResetTime } from "./reset.js";
 import { otherAgent, pickAgent } from "./router.js";
 import type { StateStore } from "./state.js";
 import type { AgentName, Attempt, Config, RunFn, TaskResult } from "./types.js";
@@ -17,6 +18,18 @@ export interface TaskRequest {
   depth: number;
   onChunk?: (text: string) => void;
   signal?: AbortSignal;
+}
+
+const LOGIN_HINT: Record<AgentName, string> = {
+  claude: "run `claude`, then /login",
+  codex: "run `codex login`",
+};
+
+function withAuthHints(message: string, attempts: Attempt[]): string {
+  const hints = attempts
+    .filter((a) => a.outcome === "auth")
+    .map((a) => `${a.agent} is not logged in: ${LOGIN_HINT[a.agent]}`);
+  return [message, ...hints].join(" | ");
 }
 
 const SUMMARY_PROMPT =
@@ -97,11 +110,13 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     // CLIs such as codex echo the prompt; remove it so our own handoff wording
     // ("hit a usage/rate limit") is never mistaken for a limit error.
     const scrub = (s: string) => s.split(prompt).join("");
-    const outcome = classify(
-      { ...result, stdout: scrub(result.stdout), stderr: scrub(result.stderr) },
-      cfg.limitPatterns,
-    );
-    if (outcome === "limited") state.setCooldown(agent, now() + cfg.defaultCooldownSec * 1000);
+    const scrubbed = { ...result, stdout: scrub(result.stdout), stderr: scrub(result.stderr) };
+    const outcome = classify(scrubbed, cfg.limitPatterns, cfg.authPatterns);
+    if (outcome === "limited") {
+      const until =
+        parseResetTime(relevantText(scrubbed), now()) ?? now() + cfg.defaultCooldownSec * 1000;
+      state.setCooldown(agent, until);
+    }
     const attempt: Attempt = { agent, outcome, exitCode: result.exitCode, stderr: result.stderr };
     return { result, outcome, attempt };
   };
@@ -136,11 +151,16 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       output: a1.result.stdout,
       failedOver: false,
       attempts: [a1.attempt],
-      message: `${first} ${a1.outcome}; ${second} unavailable (${describeCooldowns()})`,
+      message: withAuthHints(
+        `${first} ${a1.outcome}; ${second} unavailable (${describeCooldowns()})`,
+        [a1.attempt],
+      ),
     });
   }
 
-  const summary = await requestSummary(deps, first, req);
+  // A resumed session cannot answer once the agent is rate-limited or logged out,
+  // so only ask for a summary after a plain failure.
+  const summary = a1.outcome === "failed" ? await requestSummary(deps, first, req) : undefined;
   const handoff = await buildHandoff({
     prompt: req.prompt,
     cwd: req.cwd,
@@ -158,6 +178,9 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     message:
       a2.outcome === "ok"
         ? undefined
-        : `${first} ${a1.outcome}, then ${second} ${a2.outcome}: ${a2.result.stderr.trim().slice(0, 300)}`,
+        : withAuthHints(
+            `${first} ${a1.outcome}, then ${second} ${a2.outcome}: ${a2.result.stderr.trim().slice(0, 300)}`,
+            [a1.attempt, a2.attempt],
+          ),
   });
 }

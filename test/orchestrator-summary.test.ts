@@ -9,10 +9,16 @@ import { noSummaryConfig, withSummaryConfig } from "./helpers/config.js";
 
 const OK = (out: string): RunResult => ({ exitCode: 0, stdout: out, stderr: "" });
 const LIMIT: RunResult = { exitCode: 1, stdout: "", stderr: "usage limit reached" };
+const FAIL: RunResult = { exitCode: 2, stdout: "", stderr: "boom" };
+const AUTH: RunResult = { exitCode: 1, stdout: "Failed to authenticate: OAuth session expired\n", stderr: "" };
 
-function setup(config: ReturnType<typeof withSummaryConfig>, summaryResult: RunResult) {
+function setup(
+  config: ReturnType<typeof withSummaryConfig>,
+  summaryResult: RunResult,
+  first: RunResult = FAIL,
+) {
   const calls: { command: string; args: string[]; prompt: string; timeoutMs?: number }[] = [];
-  const mainResults: Record<string, RunResult[]> = { claude: [LIMIT], codex: [OK("final")] };
+  const mainResults: Record<string, RunResult[]> = { claude: [first], codex: [OK("final")] };
   const run: RunFn = async (command, args, prompt, opts) => {
     calls.push({ command, args, prompt, timeoutMs: opts.timeoutMs });
     if (args[0] === "--summary") return summaryResult;
@@ -42,6 +48,18 @@ describe("handoff summary", () => {
     expect(r.status).toBe("ok");
     const lastCall = s.calls[s.calls.length - 1];
     expect(lastCall.prompt).not.toContain("Summary from previous agent");
+  });
+
+  it("skips the summary when the first agent hit a limit (resume cannot succeed)", async () => {
+    const s = setup(withSummaryConfig(), OK("unused"), LIMIT);
+    await runTask(s.deps, { prompt: "big task", cwd: s.cwd, depth: 0 });
+    expect(s.calls.some((c) => c.args[0] === "--summary")).toBe(false);
+  });
+
+  it("skips the summary when the first agent is not logged in", async () => {
+    const s = setup(withSummaryConfig(), OK("unused"), AUTH);
+    await runTask(s.deps, { prompt: "big task", cwd: s.cwd, depth: 0 });
+    expect(s.calls.some((c) => c.args[0] === "--summary")).toBe(false);
   });
 
   it("makes no summary call when summaryArgs is not configured", async () => {
