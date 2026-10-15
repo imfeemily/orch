@@ -31,6 +31,10 @@ describe("parseArgs", () => {
     expect(parseArgs(["daemon", "stop"])).toEqual({ name: "daemon", action: "stop" });
   });
 
+  it("parses init", () => {
+    expect(parseArgs(["init"])).toEqual({ name: "init" });
+  });
+
   it("shows help with no args and rejects unknown commands", () => {
     expect(parseArgs([])).toEqual({ name: "help" });
     expect(() => parseArgs(["nope"])).toThrow(/unknown command/);

@@ -1,16 +1,39 @@
 {
-  "name": "orch",
+  "name": "claude-codex-orch",
   "version": "0.1.0",
+  "description": "Local orchestrator that routes coding tasks between Claude Code and Codex and fails over on rate limit or failure",
+  "keywords": [
+    "claude-code",
+    "codex",
+    "orchestrator",
+    "mcp",
+    "cli",
+    "agent"
+  ],
+  "license": "MIT",
   "type": "module",
   "bin": {
-    "orch": "dist/cli/index.js"
+    "orch": "dist/cli/index.js",
+    "orch-mcp": "dist/mcp/index.js"
   },
+  "files": [
+    "dist",
+    "config.example.yaml",
+    "README.md",
+    "LICENSE",
+    "docs/USAGE.th.md"
+  ],
   "scripts": {
     "build": "tsc",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm test"
   },
   "engines": {
     "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",

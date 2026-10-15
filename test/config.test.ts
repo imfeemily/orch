@@ -2,7 +2,8 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG, loadConfig } from "../src/core/config.js";
+import { existsSync, readFileSync } from "node:fs";
+import { DEFAULT_CONFIG, initConfig, loadConfig } from "../src/core/config.js";
 
 function tmpFile(content: string): string {
   const dir = mkdtempSync(join(tmpdir(), "orch-"));
@@ -49,5 +50,19 @@ describe("loadConfig", () => {
     expect(() =>
       loadConfig(tmpFile('agents:\n  codex:\n    limitPatterns: ["("]\n')),
     ).toThrow(/not a valid regex/);
+  });
+});
+
+describe("initConfig", () => {
+  it("writes a loadable default config and never overwrites", () => {
+    const dir = mkdtempSync(join(tmpdir(), "orch-"));
+    const file = join(dir, "sub", "config.yaml");
+    expect(initConfig(file)).toBe("created");
+    expect(existsSync(file)).toBe(true);
+    expect(loadConfig(file)).toEqual(DEFAULT_CONFIG);
+
+    writeFileSync(file, "defaultAgent: codex\n");
+    expect(initConfig(file)).toBe("exists");
+    expect(readFileSync(file, "utf8")).toBe("defaultAgent: codex\n");
   });
 });

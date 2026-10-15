@@ -1,7 +1,7 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
-import { parse } from "yaml";
+import { dirname, join } from "node:path";
+import { parse, stringify } from "yaml";
 import type { AgentName, Config } from "./types.js";
 
 export const AGENT_NAMES: AgentName[] = ["claude", "codex"];
@@ -80,4 +80,12 @@ function validate(cfg: Config): void {
   for (const name of AGENT_NAMES) {
     cfg.agents[name].limitPatterns.forEach(assertRegex);
   }
+}
+
+/** Writes the default config to `path` unless a file already exists there. */
+export function initConfig(path: string = join(orchHome(), "config.yaml")): "created" | "exists" {
+  if (existsSync(path)) return "exists";
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  writeFileSync(path, stringify(DEFAULT_CONFIG));
+  return "created";
 }

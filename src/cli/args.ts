@@ -1,6 +1,7 @@
 export type Command =
   | { name: "run"; prompt: string; cwd?: string }
   | { name: "status" }
+  | { name: "init" }
   | { name: "daemon"; action: "start" | "stop" }
   | { name: "help" };
 
@@ -22,6 +23,7 @@ export function parseArgs(argv: string[]): Command {
     return { name: "run", prompt, cwd };
   }
   if (cmd === "status") return { name: "status" };
+  if (cmd === "init") return { name: "init" };
   if (cmd === "daemon" && (rest[0] === "start" || rest[0] === "stop")) {
     return { name: "daemon", action: rest[0] };
   }

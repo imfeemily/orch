@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 import { join, resolve } from "node:path";
-import { orchHome } from "../core/config.js";
+import { initConfig, orchHome } from "../core/config.js";
 import { connectOrStart, isAlive, sendRequest } from "../daemon/client.js";
 import { parseArgs } from "./args.js";
 
 const USAGE = `usage:
   orch run [--cwd DIR] <prompt>   run a task (fails over between claude and codex)
   orch status                     show cooldowns and recent jobs
+  orch init                       create ~/.orch/config.yaml if missing
   orch daemon start|stop`;
 
 async function main(): Promise<number> {
@@ -17,6 +18,12 @@ async function main(): Promise<number> {
     case "help":
       console.log(USAGE);
       return 0;
+
+    case "init": {
+      const path = join(orchHome(), "config.yaml");
+      console.log(initConfig(path) === "created" ? `created ${path}` : `${path} already exists, left unchanged`);
+      return 0;
+    }
 
     case "daemon": {
       if (cmd.action === "start") {
