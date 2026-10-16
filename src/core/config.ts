@@ -32,6 +32,8 @@ export const DEFAULT_CONFIG: Config = {
       command: "claude",
       args: ["-p", "--", "{prompt}"],
       summaryArgs: ["-c", "-p", "--", "{prompt}"],
+      modelArgs: ["--model", "{model}"],
+      effortArgs: ["--effort", "{effort}"],
       limitPatterns: LIMIT_PATTERNS,
       authPatterns: AUTH_PATTERNS,
       defaultCooldownSec: 3600,
@@ -40,6 +42,8 @@ export const DEFAULT_CONFIG: Config = {
       command: "codex",
       args: ["exec", "--", "{prompt}"],
       summaryArgs: ["exec", "resume", "--last", "--", "{prompt}"],
+      modelArgs: ["-m", "{model}"],
+      effortArgs: ["-c", 'model_reasoning_effort="{effort}"'],
       limitPatterns: LIMIT_PATTERNS,
       authPatterns: AUTH_PATTERNS,
       defaultCooldownSec: 3600,
@@ -88,6 +92,13 @@ function validate(cfg: Config): void {
       throw new Error(`rule agent "${rule.agent}" must be one of ${AGENT_NAMES.join(", ")}`);
     }
     assertRegex(rule.match);
+    const agent = cfg.agents[rule.agent];
+    if (rule.model && !agent.modelArgs?.length) {
+      throw new Error(`rule "${rule.match}" sets a model but ${rule.agent} has no modelArgs`);
+    }
+    if (rule.effort && !agent.effortArgs?.length) {
+      throw new Error(`rule "${rule.match}" sets an effort but ${rule.agent} has no effortArgs`);
+    }
   }
   for (const name of AGENT_NAMES) {
     cfg.agents[name].limitPatterns.forEach(assertRegex);

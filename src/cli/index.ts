@@ -52,7 +52,7 @@ async function main(): Promise<number> {
       for (const j of m.jobs.slice(-10)) {
         const when = new Date(j.at).toISOString();
         console.log(
-          `${when} ${j.status} ${j.agent ?? "-"}${j.failedOver ? " (failover)" : ""} ${j.promptPreview}`,
+          `${when} ${j.status} ${j.agent ?? "-"}${j.failedOver ? " (failover)" : ""}${j.model ? ` [${j.model}]` : ""} ${j.promptPreview}`,
         );
       }
       return 0;

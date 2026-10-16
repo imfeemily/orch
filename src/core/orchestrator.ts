@@ -1,7 +1,8 @@
+import { buildAgentArgs } from "./agent-args.js";
 import { classify, relevantText } from "./detector.js";
 import { buildHandoff } from "./handoff.js";
 import { parseResetTime } from "./reset.js";
-import { otherAgent, pickAgent } from "./router.js";
+import { type Route, otherAgent, pickRoute } from "./router.js";
 import type { StateStore } from "./state.js";
 import type { AgentName, Attempt, Config, RunFn, TaskResult } from "./types.js";
 
@@ -67,6 +68,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
 
   const record = (res: TaskResult): TaskResult => {
     state.appendJob({
+      ...(route?.model && res.agent === route.agent ? { model: route.model } : {}),
       at: now(),
       agent: res.agent,
       status: res.status,
@@ -87,8 +89,8 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     };
   }
 
-  const first = pickAgent(config, req.prompt, cooling);
-  if (!first) {
+  const route = pickRoute(config, req.prompt, cooling);
+  if (!route) {
     return record({
       status: "unavailable",
       agent: null,
@@ -99,9 +101,10 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     });
   }
 
-  const runAttempt = async (agent: AgentName, prompt: string) => {
+  const first = route.agent;
+  const runAttempt = async (agent: AgentName, prompt: string, choice: Route = { agent }) => {
     const cfg = config.agents[agent];
-    const result = await run(cfg.command, cfg.args, prompt, {
+    const result = await run(cfg.command, buildAgentArgs(cfg, choice), prompt, {
       cwd: req.cwd,
       depth: req.depth,
       onChunk: req.onChunk,
@@ -121,7 +124,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     return { result, outcome, attempt };
   };
 
-  const a1 = await runAttempt(first, req.prompt);
+  const a1 = await runAttempt(first, req.prompt, route);
   if (a1.outcome === "ok") {
     return record({
       status: "ok",

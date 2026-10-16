@@ -66,7 +66,11 @@ tool_timeout_sec = 1800
 
 ## ปรับแต่ง `~/.orch/config.yaml`
 
-- `rules` กำหนดว่างานแบบไหนไป agent ไหน
+- `rules` กำหนดว่างานแบบไหนไป agent ไหน และเลือก **model/effort ตามชนิดงาน** ได้เพื่อประหยัดโทเค่น
+  (งานเล็กใช้ model เล็ก งานหนักใช้ model ใหญ่) เช่น
+  `match: "typo|rename"`, `agent: codex`, `model: gpt-6-luna`, `effort: low`
+  ค่านี้ใช้เฉพาะ agent ของ rule นั้น ถ้าสลับไปอีกตัวจะไม่ใช้ model นี้ (ชื่อ model ไม่ตรงกันข้ามค่าย)
+  ชื่อ model ต้องเป็นของที่บัญชีคุณใช้ได้ (ดูจาก `/model` ใน `codex`)
 - `args` ใส่ flag สิทธิ์/sandbox ของแต่ละ agent ได้ที่นี่
 - ลบ `summaryArgs` ถ้าไม่ต้องการให้ขอสรุปจากตัวแรกก่อนส่งต่อ
 - `defaultCooldownSec` ระยะพักของ agent เมื่อเจอ limit

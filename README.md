@@ -92,6 +92,25 @@ rules:
 ```
 
 - Add permission or sandbox flags for an agent to its `args`.
+- **Pick a model per task type** (the biggest token saver: send small tasks to a small
+  model). Add `model` and/or `effort` to a rule; they apply only when that rule's agent
+  is used, not to the agent it fails over to (model names are not portable):
+
+  ```yaml
+  rules:
+    - match: "typo|rename|quick|small fix|one-liner"
+      agent: codex
+      model: gpt-6-luna      # use a model your account offers (see /model in codex)
+      effort: low
+    - match: "refactor|architecture|migrate|redesign"
+      agent: claude
+      model: opus
+      effort: high
+  ```
+
+  The flags come from each agent's `modelArgs` / `effortArgs` templates
+  (defaults: Claude `--model` / `--effort`, Codex `-m` / `-c model_reasoning_effort=`).
+  `orch status` shows the model used for each job.
 - `limitPatterns` and `authPatterns` (regexes matched against stderr and the last
   20 lines of stdout) can be overridden per agent if a real error is not detected.
 - Remove `summaryArgs` to disable the handoff summary.

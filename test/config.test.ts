@@ -46,6 +46,21 @@ describe("loadConfig", () => {
     ).toThrow(/not a valid regex/);
   });
 
+  it("accepts a rule with model and effort", () => {
+    const cfg = loadConfig(
+      tmpFile('rules:\n  - match: "typo"\n    agent: codex\n    model: gpt-6-luna\n    effort: low\n'),
+    );
+    expect(cfg.rules[0]).toEqual({ match: "typo", agent: "codex", model: "gpt-6-luna", effort: "low" });
+  });
+
+  it("rejects a rule model when the agent has no modelArgs", () => {
+    expect(() =>
+      loadConfig(
+        tmpFile('agents:\n  codex:\n    modelArgs: []\nrules:\n  - match: x\n    agent: codex\n    model: m\n'),
+      ),
+    ).toThrow(/modelArgs/);
+  });
+
   it("rejects an invalid auth pattern", () => {
     expect(() =>
       loadConfig(tmpFile('agents:\n  claude:\n    authPatterns: ["("]\n')),

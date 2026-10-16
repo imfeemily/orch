@@ -7,6 +7,10 @@ export interface AgentConfig {
   args: string[];
   /** argv template used to ask the agent for a summary (handoff v2); omit to disable */
   summaryArgs?: string[];
+  /** argv template inserted when a rule picks a model; every "{model}" is replaced */
+  modelArgs?: string[];
+  /** argv template inserted when a rule picks an effort level; every "{effort}" is replaced */
+  effortArgs?: string[];
   /** case-insensitive regexes matched against stderr+stdout of a non-zero exit */
   limitPatterns: string[];
   /** case-insensitive regexes that mean "not logged in" (checked after limitPatterns) */
@@ -18,6 +22,10 @@ export interface RouteRule {
   /** case-insensitive regex tested against the prompt */
   match: string;
   agent: AgentName;
+  /** model for this agent when the rule matches (needs the agent's modelArgs) */
+  model?: string;
+  /** effort level for this agent when the rule matches (needs the agent's effortArgs) */
+  effort?: string;
 }
 
 export interface Config {
@@ -69,4 +77,5 @@ export interface JobEntry {
   status: TaskResult["status"];
   failedOver: boolean;
   promptPreview: string;
+  model?: string;
 }

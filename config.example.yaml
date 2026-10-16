@@ -16,3 +16,5 @@ rules:
     agent: claude
   - match: "typo|rename|quick|small fix|one-liner"
     agent: codex
+    # model: gpt-6-luna   # uncomment to use a cheaper model for small tasks (check /model in codex)
+    # effort: low
