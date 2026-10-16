@@ -20,14 +20,17 @@
     "dist",
     "config.example.yaml",
     "README.md",
-    "LICENSE",
-    "docs/USAGE.th.md"
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
     "prepack": "npm run build",
-    "prepublishOnly": "npm test"
+    "prepublishOnly": "npm test",
+    "docs:gen": "tsx scripts/gen-reference.ts",
+    "docs:dev": "npm run docs:gen && vitepress dev docs",
+    "docs:build": "npm run docs:gen && vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "engines": {
     "node": ">=20"
@@ -44,6 +47,7 @@
     "@types/node": "^26.6.5",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
+    "vitepress": "^1.6.4",
     "vitest": "^5.0.4"
   }
 }

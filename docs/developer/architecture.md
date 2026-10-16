@@ -1,0 +1,65 @@
+# Architecture
+
+orch is a pure library (`core`) wrapped by a daemon, with two thin clients (CLI and MCP server). Nothing in `core` knows about sockets or the CLI.
+
+```
+ CLI ──────┐               ┌─ router
+           ├─ ~/.orch/sock ┤  runner (spawns agents)
+ MCP ──────┘   daemon      │  detector, reset time
+                           │  handoff (prompt + git)
+                           └─ state.json
+```
+
+## Modules
+
+| Path | Responsibility |
+|---|---|
+| `src/core/types.ts` | Shared types: `Config`, `RunFn`, `TaskResult`, `Outcome`, ... |
+| `src/core/config.ts` | Defaults, YAML loading and merge, validation, `initConfig`, `orchHome` |
+| `src/core/router.ts` | `pickRoute`: rule match, cooldown skip, model/effort for the rule's agent |
+| `src/core/agent-args.ts` | `buildAgentArgs`: insert model/effort flags before the `--` guard |
+| `src/core/runner.ts` | `runCommand`: spawn without a shell, stream stdout, timeout, abort, `ORCH_DEPTH` |
+| `src/core/detector.ts` | `classify`: `ok`, `limited`, `auth` or `failed` from exit code and output |
+| `src/core/reset.ts` | `parseResetTime`: reset time from a limit message (clock, epoch, relative) |
+| `src/core/handoff.ts` | `buildHandoff`: original prompt, `git status`, diff or `--stat`, summary |
+| `src/core/state.ts` | `StateStore`: cooldowns and the last 50 jobs, atomic JSON writes |
+| `src/core/orchestrator.ts` | `runTask`: the whole flow, one failover, recursion guard |
+| `src/daemon/*` | Socket server, client helpers (`sendRequest`, `connectOrStart`), protocol types |
+| `src/cli/*` | `parseArgs`, shared `USAGE` text, the `orch` entry point |
+| `src/mcp/index.ts` | MCP stdio server exposing `orch_run` and `orch_status` |
+
+## Data flow of `runTask`
+
+1. Reject when `depth >= 1` (an orch-started agent called orch).
+2. `pickRoute` chooses an agent that is not cooling down, plus the matching rule's model/effort. All agents cooling returns status `unavailable`.
+3. `runAttempt` builds argv with `buildAgentArgs`, runs it, then **scrubs the prompt out of the output** (CLIs echo it, and the handoff text itself contains "rate limit") before classifying.
+4. `limited` sets a cooldown: the parsed reset time, else `defaultCooldownSec`.
+5. On anything but `ok`: if the caller aborted, stop. If the other agent is cooling, return `failed`. Otherwise build the handoff (asking the first agent for a summary only after a plain `failed`) and run the other agent once, without the rule's model.
+6. Every outcome except `rejected` appends a job record.
+
+## Classification
+
+`classify` checks, in order: exit code 0 is `ok`; a `limitPatterns` match is `limited`; an `authPatterns` match is `auth`; anything else is `failed`. Only stderr and the **last 20 lines of stdout** are searched, so an agent's work text that mentions "rate limit" cannot trigger a cooldown.
+
+## Daemon protocol
+
+Newline-delimited JSON over `~/.orch/sock` (mode 0600).
+
+- Requests: `{type:"run", prompt, cwd, depth}`, `{type:"status"}`, `{type:"shutdown"}`
+- Replies: zero or more `{type:"chunk", text}` then one of `result`, `status`, `ok`, `error`
+
+The server validates `cwd` (absolute, existing directory). Each connection owns an `AbortController`; closing the socket aborts the running agent and prevents failover.
+
+A client starts the daemon on demand (`connectOrStart`) after loading the config itself, so a broken config fails loudly in the client instead of silently in the background.
+
+## State
+
+`~/.orch/state.json`: `{ cooldowns: { claude?: ms, codex?: ms }, jobs: JobEntry[] }`. Missing or corrupt files read as empty. Writes go to a temp file and are renamed.
+
+## Design decisions worth knowing
+
+- **Single failover.** More hops waste tokens and risk ping-pong.
+- **Cooldown only for limits.** A plain failure should not bench a healthy agent.
+- **Model names are not portable.** A rule's `model` is used only with that rule's agent.
+- **No shell, one argv element.** The prompt can contain anything; `--` keeps it from being parsed as a flag.
+- **Config is read once** by the daemon; restart after editing.

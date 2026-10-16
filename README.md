@@ -6,7 +6,7 @@ a rate limit or fails. Start from either tool; orch picks the agent, remembers
 cooldowns, and hands the work over (original prompt + `git diff` + a summary
 from the first agent when it can still answer).
 
-Thai guide: [docs/USAGE.th.md](docs/USAGE.th.md)
+Documentation: the GitHub Pages site of this repository (guides in English and Thai, developer guide, reference), sources in [docs/](docs/). Thai quick start: [docs/th/guide/getting-started.md](docs/th/guide/getting-started.md).
 
 ## Requirements
 

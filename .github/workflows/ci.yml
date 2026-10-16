@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm run docs:build
+
+  docs-gate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require docs or changelog when src/ changes
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          changed=$(git diff --name-only "origin/${BASE_REF}...HEAD")
+          if echo "$changed" | grep -q '^src/' && ! echo "$changed" | grep -qE '^(docs/|CHANGELOG\.md)'; then
+            if ! printf '%s' "$PR_BODY" | grep -qi 'docs: n/a'; then
+              echo "::error::src/ changed without docs/ or CHANGELOG.md. Update the docs, or write 'docs: n/a' in the PR description."
+              exit 1
+            fi
+          fi
