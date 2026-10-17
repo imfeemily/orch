@@ -22,6 +22,7 @@ rules:
 - `defaultAgent`: `claude` หรือ `codex` ใช้เมื่อไม่มี rule ตรง
 - `agents`: ค่าของแต่ละเอเจนต์ (`claude`, `codex`) ดูด้านล่าง
 - `contexts`: preset ที่รวม flag เพิ่มเติมเพื่อลด context คงที่ของแต่ละการเรียก ดู [Context presets](#context-presets)
+- `roles`, `teams`, `pipeline`: การรันเฉพาะทาง และชุดของมันที่ตั้งชื่อไว้ ดู [Roles และทีม](#roles-และทีม)
 - `rules`: รายการเรียงลำดับ rule แรกที่ `match` ตรงกับ prompt จะถูกใช้
 
 ## key ของเอเจนต์ (`agents.<name>`)
@@ -90,6 +91,40 @@ preset ในตัว (ดู flag ที่แน่นอนที่ [defaul
 - preset ของคุณถูกผสานกับของในตัวตามชื่อและตามเอเจนต์ จึงเพิ่ม `mine:` หรือแก้เฉพาะ `lean.codex` ได้
 - ชื่อ flag และ feature เป็นของแต่ละ CLI และเปลี่ยนตามเวอร์ชัน ถ้า CLI ปฏิเสธ flag งานจะล้มและ orch จะสลับเอเจนต์ ให้แก้ preset แล้ว `orch daemon stop`
 - `orch usage --by context` เทียบ preset จากการใช้งานจริงของคุณ
+
+## Roles และทีม
+
+role คือการรันเฉพาะทาง (developer, tester, reviewer, ...) ดูวิธีรันที่หน้า [Roles](/th/guide/roles) ส่วนนี้แสดงคีย์ใน config role และทีมในตัวอยู่ที่ [defaults reference](/reference/config) ของคุณถูกผสานกับของในตัวตามชื่อและตามคีย์ จึงเพิ่ม `mine:` หรือแก้เฉพาะ `reviewer.model` ได้
+
+```yaml
+roles:
+  reviewer:
+    prompt: "You are a code reviewer. ..."
+    agent: claude          # ไม่บังคับ: ตรึงเอเจนต์ ไม่งั้นใช้ routing ปกติ
+    model: haiku           # ไม่บังคับ
+    effort: low            # ไม่บังคับ
+    context: lean          # ชื่อ context preset
+    needs: []              # ความสามารถที่ role ต้องการ `image` ตรึงไว้กับ Codex
+    writes: false          # role แก้ไฟล์โปรเจกต์ได้หรือไม่
+    agentArgs:             # flag เพิ่มเติมต่อเอเจนต์ เช่น สิทธิ์
+      claude: ["--permission-mode", "acceptEdits"]
+teams:
+  docs: [developer, reviewer]
+pipeline:
+  handoffChars: 4000
+```
+
+คีย์ของ role: `prompt`, `agent`, `model`, `effort`, `context`, `needs`, `writes`, `agentArgs` คีย์ของ pipeline: `handoffChars`
+
+- `roles.<name>.prompt`: คำสั่งที่กำหนด role (จำเป็นสำหรับ role ใหม่)
+- `roles.<name>.agent`, `model`, `effort`, `context`: role รันที่ไหนและอย่างไร เป็นของ role เอง rule ใน `rules` ไม่มีผลกับมัน
+- `roles.<name>.needs`: ความสามารถที่ role ต้องการจากเอเจนต์ มีเฉพาะ `image` role แบบนี้รันบน Codex เท่านั้น หลังตรวจความพร้อม และจะไม่ถูกย้ายไป Claude
+- `roles.<name>.writes`: `true` ถ้า role แก้ไฟล์โปรเจกต์ได้ ใช้บอกเจตนา ตัว flag สิทธิ์มาจาก `agentArgs`
+- `roles.<name>.agentArgs`: อาร์กิวเมนต์เพิ่มเติมต่อเอเจนต์ ใส่ก่อน prompt role ที่เขียนไฟล์ต้องใส่ flag สิทธิ์ของเอเจนต์ที่นี่
+- `teams.<name>`: รายการชื่อ role ทีมรันตามลำดับ architecture, designer, developer, tester, reviewer, security (role นอกรายการนี้ตามหลังตามลำดับที่เขียน)
+- `pipeline.handoffChars`: จำนวนตัวอักษรสูงสุดของ handoff จาก role ก่อนหน้าที่ส่งให้ role (ค่าเริ่มต้น 4000)
+
+การตรวจตอนโหลดจะระบุคีย์ที่ผิด: `agent` หรือ `context` ที่ไม่รู้จัก, ความสามารถใน `needs` ที่ไม่มี, role แบบ `image` ที่ตรึงไว้กับ Claude, ทีมที่อ้างถึง role ที่ไม่มี หรือ `handoffChars` ที่ไม่ใช่จำนวนเต็มบวก
 
 ## ตัวแปรสภาพแวดล้อม
 

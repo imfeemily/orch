@@ -6,6 +6,7 @@
 orch run "add a health check endpoint"          # runs in the current directory
 orch run --cwd ~/code/app "fix the failing test"
 orch run --context lean "fix the typo in README"   # skip user-level hooks, plugins and skills
+orch run --team standard "add a test for clamp()"   # developer, tester, reviewer (see Roles)
 orch status                                     # cooldowns and recent jobs
 orch init                                       # create ~/.orch/config.yaml if missing
 orch daemon start                               # optional: it starts on demand
@@ -19,6 +20,24 @@ orch usage --since 7d --by model                # token usage from the ledger
 
 The complete command list is generated from the code: see the [CLI reference](/reference/cli).
 
+## Roles
+
+Run a task through specialised roles instead of one general call. Plain `orch run` is unchanged.
+
+```bash
+orch run --role reviewer "review the last commit"             # one role
+orch run --team standard "add a test for clamp()"             # a named team
+orch run --roles developer,tester "fix the bug in parser.ts"  # your own list, in order
+orch run --team standard --dry-run "add a test for clamp()"   # show the plan, spend nothing
+```
+
+- `--role`, `--roles` and `--team` cannot be combined.
+- `--dry-run` prints the roles, their agents and the number of model calls without running anything.
+- `--require-codex` stops before anything runs when a role needs Codex and Codex is not ready; without it that role is skipped.
+- `--keep-going` continues with the remaining roles after one fails; by default the team stops.
+
+See [Roles](/guide/roles) for what each role does, handoffs and artifacts.
+
 ## Usage and cost
 
 orch records every agent attempt in `~/.orch/usage.jsonl` (kept for 90 days) and reads token counts from the agent's JSON output.
@@ -27,6 +46,7 @@ orch records every agent attempt in `~/.orch/usage.jsonl` (kept for 90 days) and
 orch usage                         # last 24 hours, per agent
 orch usage --since 7d --by model   # last 7 days, per model
 orch usage --by context            # compare context presets
+orch usage --by role               # what each role cost
 ```
 
 - The token figure is *billable tokens*: input excluding cache reads, plus output (reasoning is already inside output). It is an approximation for tracking quota, not the vendor's own accounting.
@@ -51,7 +71,7 @@ tool_timeout_sec = 1800   # Codex's default tool timeout is short; real tasks ta
 
 Tools:
 
-- `orch_run({ prompt, cwd?, context? })` runs a task and returns the agent's output followed by a `[orch] status=... agent=... failedOver=...` line. `cwd` defaults to the server's directory and must be an existing directory.
+- `orch_run({ prompt, cwd?, context?, role?, roles?, team?, dryRun?, requireCodex?, keepGoing? })` runs a task and returns the agent's output followed by a `[orch] status=... agent=... failedOver=...` line. `cwd` defaults to the server's directory and must be an existing directory.
 - `orch_status()` returns cooldowns and recent jobs as JSON.
 
 Cancelling a call stops the running agent.

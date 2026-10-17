@@ -6,6 +6,7 @@
 orch run "เพิ่ม endpoint health check"          # รันในโฟลเดอร์ปัจจุบัน
 orch run --cwd ~/code/app "แก้ test ที่พัง"
 orch run --context lean "แก้ typo ใน README"   # ข้าม hooks, plugins และ skills ระดับผู้ใช้
+orch run --team standard "เพิ่ม test ให้ clamp()"   # developer, tester, reviewer (ดู Roles)
 orch status                                     # cooldown และงานล่าสุด
 orch init                                       # สร้าง ~/.orch/config.yaml ถ้ายังไม่มี
 orch daemon start                               # ไม่จำเป็น เพราะเปิดเองเมื่อต้องใช้
@@ -20,6 +21,24 @@ orch usage --since 7d --by model                # ยอดโทเค่นจ
 
 รายการคำสั่งทั้งหมดสร้างจากโค้ดโดยตรง ดูที่ [CLI reference](/reference/cli)
 
+## Roles
+
+รันงานผ่าน role เฉพาะทางแทนการเรียกครั้งเดียวแบบทั่วไป `orch run` ธรรมดาไม่เปลี่ยน
+
+```bash
+orch run --role reviewer "review the last commit"             # role เดียว
+orch run --team standard "เพิ่ม test ให้ clamp()"             # ทีมที่ตั้งชื่อไว้
+orch run --roles developer,tester "แก้บั๊กใน parser.ts"       # รายการของคุณ ตามลำดับ
+orch run --team standard --dry-run "เพิ่ม test ให้ clamp()"   # แสดงแผน ไม่เสียโทเค่น
+```
+
+- `--role`, `--roles` และ `--team` ใช้ร่วมกันไม่ได้
+- `--dry-run` แสดง role เอเจนต์ของมัน และจำนวนการเรียก model โดยไม่รันอะไร
+- `--require-codex` หยุดก่อนเริ่มเมื่อมี role ที่ต้องใช้ Codex และ Codex ไม่พร้อม ถ้าไม่ใส่ role นั้นจะถูกข้าม
+- `--keep-going` รัน role ที่เหลือต่อหลังมี role ล้ม ค่าเริ่มต้นทีมจะหยุด
+
+ดู [Roles](/th/guide/roles) สำหรับหน้าที่ของแต่ละ role, handoff และไฟล์ที่บันทึก
+
 ## การใช้งานและค่าใช้จ่าย
 
 orch บันทึกทุก attempt ของเอเจนต์ลง `~/.orch/usage.jsonl` (เก็บ 90 วัน) และอ่านจำนวนโทเค่นจาก JSON output ของเอเจนต์
@@ -28,6 +47,7 @@ orch บันทึกทุก attempt ของเอเจนต์ลง `~
 orch usage                         # 24 ชั่วโมงล่าสุด แยกตามเอเจนต์
 orch usage --since 7d --by model   # 7 วันล่าสุด แยกตาม model
 orch usage --by context            # เทียบ context preset
+orch usage --by role               # ต้นทุนของแต่ละ role
 ```
 
 - ตัวเลขโทเค่นคือ *billable tokens*: input ที่ไม่รวม cache read บวก output (reasoning รวมอยู่ใน output แล้ว) เป็นค่าประมาณไว้ติดตามโควต้า ไม่ใช่การนับของผู้ให้บริการ
@@ -52,7 +72,7 @@ tool_timeout_sec = 1800   # ค่าเริ่มต้นของ Codex ส
 
 Tools:
 
-- `orch_run({ prompt, cwd?, context? })` รันงานและคืนผลของเอเจนต์ ตามด้วยบรรทัด `[orch] status=... agent=... failedOver=...` ค่า `cwd` ต้องเป็นโฟลเดอร์ที่มีอยู่จริง
+- `orch_run({ prompt, cwd?, context?, role?, roles?, team?, dryRun?, requireCodex?, keepGoing? })` รันงานและคืนผลของเอเจนต์ ตามด้วยบรรทัด `[orch] status=... agent=... failedOver=...` ค่า `cwd` ต้องเป็นโฟลเดอร์ที่มีอยู่จริง
 - `orch_status()` คืน cooldown และงานล่าสุดเป็น JSON
 
 การยกเลิกคำสั่งจะหยุดเอเจนต์ที่กำลังรันด้วย

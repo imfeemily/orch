@@ -49,6 +49,7 @@ export default defineConfig({
               items: [
                 { text: "Getting started", link: "/guide/getting-started" },
                 { text: "Usage", link: "/guide/usage" },
+                { text: "Roles", link: "/guide/roles" },
                 { text: "Configuration", link: "/guide/configuration" },
                 { text: "Troubleshooting", link: "/guide/troubleshooting" },
                 { text: "Benchmarks", link: "/guide/benchmarks" },
@@ -78,6 +79,7 @@ export default defineConfig({
               items: [
                 { text: "เริ่มต้นใช้งาน", link: "/th/guide/getting-started" },
                 { text: "วิธีใช้งาน", link: "/th/guide/usage" },
+                { text: "Roles", link: "/th/guide/roles" },
                 { text: "การตั้งค่า", link: "/th/guide/configuration" },
                 { text: "แก้ปัญหา", link: "/th/guide/troubleshooting" },
                 { text: "ผลวัดจริง", link: "/th/guide/benchmarks" },

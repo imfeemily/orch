@@ -22,6 +22,9 @@ orch is a pure library (`core`) wrapped by a daemon, with two thin clients (CLI 
 | `src/core/detector.ts` | `classify`: `ok`, `limited`, `auth` or `failed` from exit code and output |
 | `src/core/output.ts` | `parseAgentOutput`: the answer, error text and token usage from Claude JSON, Codex JSONL or plain text; anything unexpected falls back to the raw text |
 | `src/core/usage.ts` | `Ledger` (`usage.jsonl`, never throws), `summarize`, `billableTokens`, `parseDuration` |
+| `src/core/roles.ts` | `planRoles` (role, list or team to ordered names), `buildRolePrompt`, `extractHandoff`, `capHandoffs` |
+| `src/core/readiness.ts` | `createReadinessChecker`: installed, logged in, capability and cooldown checks with free commands, cached for 60 seconds |
+| `src/core/team.ts` | `runRoles`: the single-role, team and dry-run flows; runs each role as a `runTask`, writes artifacts, applies the failure and abort rules |
 | `src/core/reset.ts` | `parseResetTime`: reset time from a limit message (clock, epoch, relative) |
 | `src/core/handoff.ts` | `buildHandoff`: original prompt, `git status`, diff or `--stat`, summary |
 | `src/core/state.ts` | `StateStore`: cooldowns and the last 50 jobs, atomic JSON writes |
@@ -57,6 +60,10 @@ A client starts the daemon on demand (`connectOrStart`) after loading the config
 ## State
 
 `~/.orch/state.json`: `{ cooldowns: { claude?: ms, codex?: ms }, jobs: JobEntry[] }`. Missing or corrupt files read as empty. Writes go to a temp file and are renamed.
+
+## Roles
+
+A role is config, not an engine: `runRoles` plans the role names (`planRoles`), checks readiness for roles that need a capability, and calls `runTask` once per role with `role` set. In `runTask` a role replaces the rule lookup (`pickRoleRoute`): its agent, model, effort and context apply, its `agentArgs` for the running agent are added before the `--` guard, and a role that needs a capability never fails over. Roles in a team run in sequence; each role's full answer is saved to `.orch/runs/<run-id>/<role>.md` and a short handoff (the `## Handoff` section, or the last 1,500 characters) is passed on within `pipeline.handoffChars`. The run id is also the ledger `taskId`, so `orch usage --by role` groups a team's calls. Plain `orch run` never touches this path: the daemon only calls `runRoles` when a role field is present.
 
 ## Usage ledger
 

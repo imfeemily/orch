@@ -21,6 +21,7 @@ rules:
 - `defaultAgent`: `claude` or `codex`. Used when no rule matches.
 - `agents`: settings per agent (`claude`, `codex`); see below.
 - `contexts`: named presets of extra flags that shrink the fixed context of each call; see [Context presets](#context-presets).
+- `roles`, `teams`, `pipeline`: specialised runs and the named sets of them; see [Roles and teams](#roles-and-teams).
 - `rules`: ordered list; the first rule whose `match` fits the prompt wins.
 
 ## Agent keys (`agents.<name>`)
@@ -88,6 +89,40 @@ Things to know before using one:
 - Your own presets are merged with the built-in ones by name and by agent, so you can add `mine:` or change just `lean.codex`.
 - Flag and feature names belong to each CLI and change between versions. If a CLI rejects a flag, the run fails and orch fails over; fix the preset and run `orch daemon stop`.
 - `orch usage --by context` compares presets from your own usage.
+
+## Roles and teams
+
+A role is a specialised run (developer, tester, reviewer, ...). See the [Roles](/guide/roles) page for how they run; this section lists the config keys. Built-in roles and teams are in the [defaults reference](/reference/config); your entries are merged with them by name and by key, so you can add `mine:` or change just `reviewer.model`.
+
+```yaml
+roles:
+  reviewer:
+    prompt: "You are a code reviewer. ..."
+    agent: claude          # optional: pin an agent; otherwise normal routing
+    model: haiku           # optional
+    effort: low            # optional
+    context: lean          # a context preset name
+    needs: []              # capabilities the role needs; `image` pins it to Codex
+    writes: false          # may the role change project files
+    agentArgs:             # extra flags per agent, for example permissions
+      claude: ["--permission-mode", "acceptEdits"]
+teams:
+  docs: [developer, reviewer]
+pipeline:
+  handoffChars: 4000
+```
+
+Role keys: `prompt`, `agent`, `model`, `effort`, `context`, `needs`, `writes`, `agentArgs`. Pipeline key: `handoffChars`.
+
+- `roles.<name>.prompt`: the instructions that define the role (required for a new role).
+- `roles.<name>.agent`, `model`, `effort`, `context`: where and how the role runs. They are the role's own; the rules under `rules` do not apply to it.
+- `roles.<name>.needs`: capabilities the role needs from its agent. Only `image` exists; such a role runs on Codex only, after a readiness check, and is never moved to Claude.
+- `roles.<name>.writes`: `true` if the role may change project files. It documents intent; the permission flags themselves come from `agentArgs`.
+- `roles.<name>.agentArgs`: extra command-line arguments per agent, added before the prompt. Roles that write need the agent's permission flags here.
+- `teams.<name>`: a list of role names. Teams run in the order architecture, designer, developer, tester, reviewer, security (roles not in that list follow in the order written).
+- `pipeline.handoffChars`: the most characters of earlier roles' handoffs given to a role (default 4000).
+
+Validation at load names the key: unknown `agent` or `context`, unknown capability in `needs`, an `image` role pinned to Claude, a team naming an unknown role, or a `handoffChars` that is not a positive integer.
 
 ## Environment variables
 

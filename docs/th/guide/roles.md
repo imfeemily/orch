@@ -1,0 +1,88 @@
+# Roles
+
+**role** คือการรันเอเจนต์แบบเฉพาะทาง: developer ลงมือเขียน, tester เขียน test, reviewer ตรวจ แทนที่จะเรียกครั้งเดียวแบบทั่วไป orch รันหลาย role ต่อกันได้ แต่ละ role มีคำสั่งของตัวเอง และส่งสรุปสั้นๆ ต่อให้ role ถัดไป
+
+role เป็น opt-in `orch run "..."` ที่ไม่มี flag ของ role ทำงานเหมือนเดิมทุกอย่าง
+
+::: info ในเวอร์ชันนี้
+role ในตัว: `developer`, `tester`, `reviewer` ทีม `quick` คือ `developer` ส่วนทีม `standard` คือ `developer`, `tester`, `reviewer` role architecture, designer, security, การเลือก role อัตโนมัติ และการรัน role อ่านอย่างเดียวขนานกัน อยู่ในแผน ส่วนการกำหนด role และทีมของคุณเองทำได้แล้วใน config
+:::
+
+## วิธีรัน
+
+```bash
+orch run --role reviewer "review the last commit"             # role เดียว
+orch run --team standard "add a test for clamp() in src/math.ts"   # ทีมที่ตั้งชื่อไว้
+orch run --roles developer,tester "fix the bug in parser.ts"  # รายการที่คุณกำหนด ตามลำดับนี้
+orch run --team standard --dry-run "add a test for clamp()"   # แสดงแผน ไม่เสียโทเค่น
+```
+
+`--role`, `--roles` และ `--team` ใช้ร่วมกันไม่ได้ ตัวเลือกเดียวกันมีใน MCP tool `orch_run` (`role`, `roles`, `team`, `dryRun`, `requireCodex`, `keepGoing`)
+
+- **role เดียว** (`--role`): เรียกครั้งเดียวด้วยคำสั่ง, agent, model และ context ของ role นั้น แสดงคำตอบตามปกติ
+- **ทีม** (`--team`): role ของทีมรันตามลำดับคงที่: architecture, designer, developer, tester, reviewer, security (เฉพาะที่ทีมมี)
+- **รายการ** (`--roles`): รันตามลำดับที่คุณระบุ
+
+## แต่ละ role ทำอะไร
+
+| Role | ทำอะไร | แก้ไฟล์โปรเจกต์ |
+|---|---|---|
+| `developer` | ทำงานตามโจทย์ด้วยการเปลี่ยนแปลงที่น้อยที่สุด | ใช่ |
+| `tester` | เพิ่มหรืออัปเดต test (เฉพาะไฟล์ test) | ใช่ |
+| `reviewer` | ตรวจการเปลี่ยนแปลงใน working tree และรายงานบั๊กกับความเสี่ยง | ไม่ |
+
+แต่ละ role คือการรัน orch ตามปกติหนึ่งครั้ง จึงใช้ routing, failover เมื่อติด rate limit, context preset และ ledger ได้ครบ เมื่อ failover ไปอีกเอเจนต์ role ยังคงชื่อ context preset และใช้ flag ของเอเจนต์นั้นเอง
+
+## role ส่งงานต่อกันอย่างไร
+
+1. ทุก role ในทีมถูกขอให้ปิดคำตอบด้วยหัวข้อ `## Handoff` ไม่เกิน 150 คำ
+2. orch บันทึกคำตอบเต็มของ role ที่ `.orch/runs/<run-id>/<role>.md` ในโปรเจกต์ และเก็บ handoff ไว้ ถ้า role ไม่เขียนหัวข้อนี้ จะใช้ 1,500 ตัวอักษรสุดท้ายของคำตอบ
+3. role ถัดไปได้รับโจทย์พร้อม handoff ก่อนหน้า จำกัดที่ `pipeline.handoffChars` (ค่าเริ่มต้น 4,000 ตัวอักษร) เอาของใหม่สุดก่อน
+
+`.orch/runs/` มี `.gitignore` ของตัวเองที่เขียนว่า `*` ไฟล์เหล่านี้จึงไม่เข้า git โดยไม่แตะ `.gitignore` ของคุณ ถ้าเขียนไฟล์ไม่ได้ งานยังรันต่อไปโดยไม่มีไฟล์เหล่านั้น
+
+role ที่แก้ไฟล์ได้รันทีละตัว ถ้า role หนึ่งล้ม (หลัง failover แล้ว) ทีมจะหยุดและ role ที่เหลือถูกรายงานเป็น `not-run` ใส่ `--keep-going` เพื่อรันต่อ
+
+## role ที่ต้องใช้ Codex
+
+role ที่มี `needs: [image]` (เช่น role ที่สร้างภาพ mockup หรือ diagram) รันบน Codex เท่านั้น และเมื่อ orch ตรวจแล้วว่า Codex พร้อม โดยไม่เสียโทเค่นเลย:
+
+- มีคำสั่ง `codex` ติดตั้งอยู่
+- `codex login status` สำเร็จ
+- ฟีเจอร์ `image_generation` เปิดอยู่ใน `codex features list`
+- Codex ไม่ติด cooldown จาก rate limit
+
+ถ้า Codex ไม่พร้อม role นั้นจะถูก **ข้าม** พร้อมเหตุผล (เช่น `not logged in: run codex login`) และ role อื่นทำงานต่อ ใส่ `--require-codex` เพื่อหยุดก่อนเริ่มอะไรเลยแทน role ที่ต้องการความสามารถพิเศษจะไม่ถูกย้ายไป Claude เพราะ Claude ทำงานนั้นไม่ได้
+
+```yaml
+roles:
+  mockup:
+    prompt: "You are a UX designer. Describe and generate a mockup image of the screen in the task."
+    needs: [image]
+    writes: false
+```
+
+การสร้างภาพผ่าน Codex แบบ headless ยังไม่ได้ยืนยันตั้งแต่ต้นจนจบในเวอร์ชันนี้: การตรวจความพร้อมและ routing ทำงานได้ แต่ให้ตรวจผลของ role ที่สร้างภาพด้วยตัวเอง
+
+## วางแผนก่อนด้วย `--dry-run`
+
+`--dry-run` แสดงว่า role ไหนจะรันบนเอเจนต์ไหน และเรียก model กี่ครั้ง รวมถึง role ที่จะถูกข้าม โดยไม่เสียโทเค่น
+
+```text
+plan: 3 model calls planned
+  developer  claude
+  tester     claude
+  reviewer   claude
+```
+
+## ต้นทุน
+
+หลาย role คือหลายการเรียก และทุกการเรียกโหลด context คงที่ของเอเจนต์ก่อน (ดู [ผลวัดจริง](/th/guide/benchmarks)) ทีม `standard` จึงแพงราวสามเท่าของการเรียกครั้งเดียว ประโยชน์คือการตรวจและ test ไม่ใช่การประหยัด เพื่อคุมต้นทุน: ใช้เฉพาะ role ที่จำเป็น ให้ role อ่านอย่างเดียวใช้ [context preset](/th/guide/configuration#context-presets) เช่น `lean` (`reviewer` ในตัวใช้อยู่แล้ว) และเทียบด้วย `orch usage --by role`
+
+## สิทธิ์
+
+`developer` และ `tester` ถูกสร้างมาให้แก้โปรเจกต์ของคุณ เอเจนต์แบบ headless แก้ไฟล์ไม่ได้ถ้าไม่มี flag สิทธิ์ role เหล่านี้จึงพกมาผ่าน `agentArgs` (Claude `--permission-mode acceptEdits`, Codex `-s workspace-write`) การใช้ role เหล่านี้ทำให้เอเจนต์แก้ไฟล์ในโฟลเดอร์ที่คุณรันได้ ควรตรวจผลด้วย `git diff`
+
+## การปรับแต่ง
+
+role และทีมคือ config ธรรมดา ดู [Roles และทีม](/th/guide/configuration#roles-และทีม) สำหรับทุกคีย์ และ [defaults reference](/reference/config) สำหรับค่าในตัว
