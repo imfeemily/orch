@@ -48,6 +48,7 @@ describe("selectRoles", () => {
     expect(selectRoles(cfg({ keywords: { security: [".env"] } }), "update the .environment page").roles).not.toContain("security");
     expect(selectRoles(cfg({ keywords: { architecture: ["c++"] } }), "port the c++ module").roles).toContain("architecture");
     expect(selectRoles(cfg(), "แก้login bug ให้หน่อย").roles).toContain("security");
+    expect(selectRoles(cfg(), "แก้ไขlogin ให้หน่อย").roles).toContain("security");
   });
 
   it("selects custom roles from auto.keywords, after the built-in ones", () => {
