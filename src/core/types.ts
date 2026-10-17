@@ -171,4 +171,6 @@ export interface PlanStep {
   role: string;
   agent: AgentName | null;
   skipReason?: string;
+  /** steps that share a number run at the same time */
+  group?: number;
 }

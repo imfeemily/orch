@@ -6,7 +6,7 @@ import { StateStore } from "../src/core/state.js";
 import type { Config, RunFn, RunResult } from "../src/core/types.js";
 import { Ledger } from "../src/core/usage.js";
 import type { ReadinessChecker } from "../src/core/readiness.js";
-import { runAuto, runRoles } from "../src/core/team.js";
+import { groupSteps, runAuto, runRoles } from "../src/core/team.js";
 import { noSummaryConfig } from "./helpers/config.js";
 
 const ok = (stdout: string): RunResult => ({ exitCode: 0, stdout, stderr: "" });
@@ -16,7 +16,13 @@ const NOT_READY: ReadinessChecker = async () => ({ ready: false, reasons: ["not 
 
 function setup(
   outputs: Record<string, RunResult>,
-  opts: { readiness?: ReadinessChecker; tweak?: (c: Config) => void; onRun?: (role: string, prompt: string, cwd: string) => void } = {},
+  opts: {
+    readiness?: ReadinessChecker;
+    tweak?: (c: Config) => void;
+    onRun?: (role: string, prompt: string, cwd: string) => void;
+    delays?: Record<string, number>;
+    abortOn?: string;
+  } = {},
 ) {
   const config = noSummaryConfig();
   config.roles.pic = { prompt: "You are the picture maker.", needs: ["image"], writes: false };
@@ -24,12 +30,23 @@ function setup(
   const calls: { command: string; prompt: string; role: string }[] = [];
   const cwdRef = { value: "" };
   let abort: (() => void) | undefined;
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const events: string[] = [];
   const run: RunFn = async (command, _args, prompt) => {
     const role = Object.keys(config.roles).find((r) => prompt.includes(config.roles[r].prompt)) ?? "?";
     calls.push({ command, prompt, role });
     opts.onRun?.(role, prompt, cwdRef.value);
+    inFlight++;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    events.push(`start:${role}`);
+    const delay = opts.delays?.[role];
+    if (delay) await new Promise((r) => setTimeout(r, delay));
+    inFlight--;
+    events.push(`end:${role}`);
     const r = outputs[role] ?? ok(`${role} output\n## Handoff\n${role} handoff`);
     if (role === "developer") abort?.();
+    if (opts.abortOn && role === opts.abortOn) ac.abort();
     return r;
   };
   const dir = mkdtempSync(join(tmpdir(), "orch-"));
@@ -40,7 +57,7 @@ function setup(
   const ledger = new Ledger(join(dir, "usage.jsonl"));
   const ac = new AbortController();
   return {
-    calls, cwd, ledger, config, signal: ac.signal, abortAfterDeveloper: () => (abort = () => ac.abort()),
+    calls, cwd, ledger, config, signal: ac.signal, events, maxInFlight: () => maxInFlight, abortAfterDeveloper: () => (abort = () => ac.abort()),
     deps: { config, state, run, ledger, now: () => 1, readiness: opts.readiness ?? READY },
   };
 }
@@ -175,6 +192,131 @@ describe("runRoles: image roles and assets", () => {
     expect(run.roles![1]).toMatchObject({ role: "pic", status: "skipped" });
     expect(run.roles![1].reason).toContain("disables image generation");
     expect(s.calls.map((c) => c.role)).toEqual(["developer"]);
+  });
+});
+
+describe("groupSteps", () => {
+  const step = (role: string) => ({ role, agent: "claude" as const });
+  const withRoles = (extra: Record<string, boolean>, maxParallel = 2) => {
+    const c = noSummaryConfig();
+    for (const [name, writes] of Object.entries(extra)) c.roles[name] = { prompt: name, needs: [], writes };
+    c.pipeline.maxParallel = maxParallel;
+    return c;
+  };
+
+  it("keeps writers alone and batches adjacent read-only roles", () => {
+    const c = noSummaryConfig();
+    const g = groupSteps(["developer", "tester", "reviewer", "security"].map(step), c, true);
+    expect(g.map((x) => x.map((s) => s.role))).toEqual([["developer"], ["tester"], ["reviewer", "security"]]);
+  });
+
+  it("never batches across a writer", () => {
+    const g = groupSteps(["reviewer", "developer", "security"].map(step), noSummaryConfig(), true);
+    expect(g.map((x) => x.length)).toEqual([1, 1, 1]);
+  });
+
+  it("is all single groups when parallel is off or maxParallel is 1", () => {
+    const names = ["reviewer", "security"].map(step);
+    expect(groupSteps(names, noSummaryConfig(), false).map((x) => x.length)).toEqual([1, 1]);
+    expect(groupSteps(names, withRoles({}, 1), true).map((x) => x.length)).toEqual([1, 1]);
+  });
+
+  it("splits a long run of read-only roles into batches of maxParallel", () => {
+    const c = withRoles({ a: false, b: false });
+    const g = groupSteps(["reviewer", "security", "a", "b"].map(step), c, true);
+    expect(g.map((x) => x.map((s) => s.role))).toEqual([["reviewer", "security"], ["a", "b"]]);
+    const c3 = withRoles({ a: false }, 2);
+    expect(groupSteps(["reviewer", "security", "a"].map(step), c3, true).map((x) => x.length)).toEqual([2, 1]);
+  });
+});
+
+describe("runRoles: parallel read-only roles", () => {
+  const tweak = (c: Config) => {
+    c.teams.par = ["developer", "reviewer", "security"];
+    c.roles.extra = { prompt: "You are the extra role.", needs: [], writes: true };
+    c.teams.after = ["reviewer", "security", "extra"];
+  };
+
+  it("runs reviewer and security at the same time, but never together with the developer", async () => {
+    const s = setup({}, { tweak, delays: { developer: 20, reviewer: 40, security: 40 } });
+    const r = await go(s, { team: "par" });
+    expect(r.status).toBe("ok");
+    expect(s.maxInFlight()).toBe(2);
+    const at = (e: string) => s.events.indexOf(e);
+    expect(at("end:developer")).toBeLessThan(at("start:reviewer"));
+    expect(at("start:security")).toBeLessThan(at("end:reviewer"));
+  });
+
+  it("reports results, outputs and artifacts in plan order whichever call finishes first", async () => {
+    const s = setup({}, { tweak, delays: { reviewer: 80, security: 5 } });
+    const r = await go(s, { team: "par" });
+    expect(s.events.indexOf("end:security")).toBeLessThan(s.events.indexOf("end:reviewer"));
+    expect(r.roles!.map((x) => x.role)).toEqual(["developer", "reviewer", "security"]);
+    expect(r.output.indexOf("## reviewer")).toBeLessThan(r.output.indexOf("## security"));
+    for (const x of r.roles!) expect(readFileSync(x.artifact!, "utf8")).toContain(`${x.role} output`);
+  });
+
+  it("gives both roles of a batch the same earlier handoffs and never each other's", async () => {
+    const s = setup({}, { tweak, delays: { reviewer: 30, security: 30 } });
+    await go(s, { team: "par" });
+    const rev = s.calls.find((c) => c.role === "reviewer")!.prompt;
+    const sec = s.calls.find((c) => c.role === "security")!.prompt;
+    expect(rev).toContain("### developer");
+    expect(sec).toContain("### developer");
+    expect(rev).not.toContain("### security");
+    expect(sec).not.toContain("### reviewer");
+  });
+
+  it("lets the sibling finish when one role of a batch fails, then stops the team", async () => {
+    const s = setup({ security: FAIL }, { tweak, delays: { reviewer: 40, security: 5 } });
+    const r = await go(s, { team: "after" });
+    expect(r.status).toBe("failed");
+    expect(r.roles!.map((x) => [x.role, x.status])).toEqual([["reviewer", "ok"], ["security", "failed"], ["extra", "not-run"]]);
+    expect(s.calls.some((c) => c.role === "reviewer")).toBe(true);
+  });
+
+  it("runs the next role after a failed batch when keepGoing is set", async () => {
+    const s = setup({ security: FAIL }, { tweak });
+    const r = await go(s, { team: "after" }, { keepGoing: true });
+    expect(r.roles!.map((x) => x.status)).toEqual(["ok", "failed", "ok"]);
+  });
+
+  it("is sequential with --sequential and with pipeline.parallel false, with the same results", async () => {
+    const a = setup({}, { tweak, delays: { reviewer: 20, security: 20 } });
+    const ra = await go(a, { team: "par" }, { sequential: true });
+    expect(a.maxInFlight()).toBe(1);
+    const b = setup({}, { tweak: (c) => { tweak(c); c.pipeline.parallel = false; }, delays: { reviewer: 20, security: 20 } });
+    const rb = await go(b, { team: "par" });
+    expect(b.maxInFlight()).toBe(1);
+    expect(ra.roles!.map((x) => x.status)).toEqual(rb.roles!.map((x) => x.status));
+  });
+
+  it("does not let a skipped role take a parallel slot", async () => {
+    const readiness: ReadinessChecker = async (agent) => (agent === "codex" ? { ready: false, reasons: ["not logged in"] } : { ready: true, reasons: [] });
+    const s = setup({}, { readiness, delays: { reviewer: 40, security: 40 } });
+    const r = await go(s, { roles: ["pic", "reviewer", "security"] });
+    expect(r.roles!.find((x) => x.role === "pic")!.status).toBe("skipped");
+    expect(s.maxInFlight()).toBe(2);
+  });
+
+  it("cancels the roles after a batch when aborted during it", async () => {
+    const s = setup({}, { tweak, delays: { reviewer: 10, security: 40 }, abortOn: "reviewer" });
+    const r = await go(s, { team: "after" }, { signal: s.signal });
+    expect(r.roles!.map((x) => x.status)).toEqual(["ok", "ok", "not-run"]);
+    expect(r.roles![2].reason).toBe("cancelled");
+    expect(r.status).toBe("failed");
+    expect(r.message).toContain("aborted");
+  });
+
+  it("marks batch members with a shared group number in a dry run, and none when sequential", async () => {
+    const s = setup({}, { tweak });
+    const dry = await go(s, { team: "par" }, { dryRun: true });
+    const g = Object.fromEntries(dry.plan!.map((p) => [p.role, p.group]));
+    expect(g.developer).toBeUndefined();
+    expect(g.reviewer).toBeDefined();
+    expect(g.reviewer).toBe(g.security);
+    const seq = await go(s, { team: "par" }, { dryRun: true, sequential: true });
+    expect(seq.plan!.every((p) => p.group === undefined)).toBe(true);
   });
 });
 

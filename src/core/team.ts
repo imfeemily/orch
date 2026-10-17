@@ -6,7 +6,7 @@ import { type ReadinessChecker, contextBlocks } from "./readiness.js";
 import { type Handoff, type RoleSelection, buildRolePrompt, capHandoffs, extractHandoff, planRoles } from "./roles.js";
 import { pickRoleRoute } from "./router.js";
 import { selectRoles } from "./select-roles.js";
-import type { AgentName, PlanStep, RoleResult, TaskResult, Usage } from "./types.js";
+import type { AgentName, Config, PlanStep, RoleResult, TaskResult, Usage } from "./types.js";
 
 export interface TeamDeps extends Deps {
   readiness: ReadinessChecker;
@@ -23,6 +23,8 @@ export interface TeamRequest extends RoleSelection {
   requireCodex?: boolean;
   keepGoing?: boolean;
   auto?: boolean;
+  /** run one role at a time even when read-only roles could overlap */
+  sequential?: boolean;
 }
 
 /** Files (not directories, not dotfiles) an image role left in its assets directory. */
@@ -35,6 +37,24 @@ function listAssets(dir: string): string[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Batches of steps that run together: adjacent read-only roles, at most `pipeline.maxParallel`
+ * per batch. A role that writes always runs alone.
+ */
+export function groupSteps(steps: PlanStep[], config: Config, parallel: boolean): PlanStep[][] {
+  const readOnly = (s: PlanStep) => config.roles[s.role].writes === false;
+  const groups: PlanStep[][] = [];
+  for (const step of steps) {
+    const last = groups[groups.length - 1];
+    if (parallel && readOnly(step) && last && last.every(readOnly) && last.length < config.pipeline.maxParallel) {
+      last.push(step);
+    } else {
+      groups.push([step]);
+    }
+  }
+  return groups;
 }
 
 const rejected = (message: string): TaskResult => ({
@@ -132,7 +152,15 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
     return { ...rejected(`codex is required but not ready (${why})`), status: "failed" };
   }
 
+  const parallelOn = config.pipeline.parallel && !req.sequential && !single;
   if (req.dryRun) {
+    let n = 0;
+    for (const g of groupSteps(steps.filter((s) => !s.skipReason), config, parallelOn)) {
+      if (g.length > 1) {
+        n += 1;
+        for (const s of g) s.group = n;
+      }
+    }
     const calls = steps.filter((s) => !s.skipReason).length;
     return {
       status: "planned",
@@ -169,7 +197,7 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
   }
 
   const results: RoleResult[] = [];
-  const outputs: string[] = [];
+  const outputsByRole = new Map<string, string>();
   const attempts: TaskResult["attempts"] = [];
   const handoffs: Handoff[] = [];
   let failed = false;
@@ -178,59 +206,87 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
   let lastAgent: AgentName | null = null;
   const messages: string[] = [];
 
-  for (const step of steps) {
+  // Roles skipped when the plan was made do not take a place in any batch.
+  for (const step of steps.filter((s) => s.skipReason)) {
+    results.push({ role: step.role, agent: step.agent, status: "skipped", reason: step.skipReason });
+    messages.push(`role "${step.role}" skipped: ${step.skipReason}`);
+  }
+
+  for (const group of groupSteps(steps.filter((s) => !s.skipReason), config, parallelOn)) {
     if (req.signal?.aborted) aborted = true;
     if (aborted) {
-      results.push({ role: step.role, agent: step.agent, status: "not-run", reason: "cancelled" });
+      for (const step of group) results.push({ role: step.role, agent: step.agent, status: "not-run", reason: "cancelled" });
       continue;
     }
     if (failed && !req.keepGoing) {
-      results.push({ role: step.role, agent: step.agent, status: "not-run", reason: "an earlier role failed" });
-      continue;
-    }
-    const role = config.roles[step.role];
-    if (!step.skipReason && role.needs.length > 0 && step.agent) {
-      // An earlier role may have hit a rate limit since the plan was made: check again, do not fail.
-      const blocked = contextBlocks(config.contexts[req.context ?? role.context ?? ""]?.[step.agent], role.needs);
-      if (blocked) {
-        step.skipReason = blocked;
-      } else {
-        const now = await deps.readiness(step.agent, role.needs);
-        if (!now.ready) step.skipReason = now.reasons.join("; ");
-      }
-    }
-    if (step.skipReason) {
-      results.push({ role: step.role, agent: step.agent, status: "skipped", reason: step.skipReason });
-      messages.push(`role "${step.role}" skipped: ${step.skipReason}`);
+      for (const step of group) results.push({ role: step.role, agent: step.agent, status: "not-run", reason: "an earlier role failed" });
       continue;
     }
 
-    const assets = prepareAssets(req.cwd, runId, role.needs.length > 0);
-    const prompt = buildRolePrompt(role, req.task, capHandoffs(handoffs, config.pipeline.handoffChars), true, assets?.rel);
-    const r = await runTask(deps, {
-      prompt,
-      cwd: req.cwd,
-      depth: req.depth,
-      role: step.role,
-      runId,
-      context: req.context,
-      signal: req.signal,
-    });
-    attempts.push(...r.attempts);
-    failedOver ||= r.failedOver;
-    lastAgent = r.agent ?? lastAgent;
-    const artifact = writeArtifact(req.cwd, runId, step.role, r.output);
-    if (r.status === "ok") {
-      handoffs.push({ role: step.role, text: extractHandoff(r.output) });
-      results.push({ role: step.role, agent: r.agent, status: "ok", artifact, usage: r.usage, ...(assets ? { assets: listAssets(assets.abs) } : {}) });
-    } else {
-      failed = true;
-      results.push({ role: step.role, agent: r.agent, status: "failed", reason: r.message ?? r.status, artifact, usage: r.usage, ...(assets ? { assets: listAssets(assets.abs) } : {}) });
-      messages.push(`role "${step.role}" ${r.status}: ${r.message ?? ""}`.trim());
+    // An earlier role may have hit a rate limit since the plan was made: check again, do not fail.
+    const toRun: PlanStep[] = [];
+    for (const step of group) {
+      const role = config.roles[step.role];
+      if (role.needs.length > 0 && step.agent) {
+        const blocked = contextBlocks(config.contexts[req.context ?? role.context ?? ""]?.[step.agent], role.needs);
+        if (blocked) {
+          step.skipReason = blocked;
+        } else {
+          const now = await deps.readiness(step.agent, role.needs);
+          if (!now.ready) step.skipReason = now.reasons.join("; ");
+        }
+      }
+      if (step.skipReason) {
+        results.push({ role: step.role, agent: step.agent, status: "skipped", reason: step.skipReason });
+        messages.push(`role "${step.role}" skipped: ${step.skipReason}`);
+      } else {
+        toRun.push(step);
+      }
     }
-    if (r.output) outputs.push(`## ${step.role}\n${r.output}`);
+
+    // Every role of a batch starts from the same handoffs and never sees its siblings'.
+    const snapshot = capHandoffs(handoffs, config.pipeline.handoffChars);
+    const done = await Promise.all(
+      toRun.map(async (step) => {
+        const role = config.roles[step.role];
+        const assets = prepareAssets(req.cwd, runId, role.needs.length > 0);
+        const prompt = buildRolePrompt(role, req.task, snapshot, true, assets?.rel);
+        const r = await runTask(deps, {
+          prompt,
+          cwd: req.cwd,
+          depth: req.depth,
+          role: step.role,
+          runId,
+          context: req.context,
+          signal: req.signal,
+        });
+        return { step, assets, r };
+      }),
+    );
+
+    for (const { step, assets, r } of done) {
+      attempts.push(...r.attempts);
+      failedOver ||= r.failedOver;
+      lastAgent = r.agent ?? lastAgent;
+      const artifact = writeArtifact(req.cwd, runId, step.role, r.output);
+      const listed = assets ? { assets: listAssets(assets.abs) } : {};
+      if (r.status === "ok") {
+        handoffs.push({ role: step.role, text: extractHandoff(r.output) });
+        results.push({ role: step.role, agent: r.agent, status: "ok", artifact, usage: r.usage, ...listed });
+      } else {
+        failed = true;
+        results.push({ role: step.role, agent: r.agent, status: "failed", reason: r.message ?? r.status, artifact, usage: r.usage, ...listed });
+        messages.push(`role "${step.role}" ${r.status}: ${r.message ?? ""}`.trim());
+      }
+      if (r.output) outputsByRole.set(step.role, `## ${step.role}\n${r.output}`);
+    }
     if (req.signal?.aborted) aborted = true;
   }
+
+  // Report everything in plan order, whichever call finished first.
+  const order = new Map(steps.map((s, i) => [s.role, i]));
+  results.sort((x, y) => (order.get(x.role) ?? 0) - (order.get(y.role) ?? 0));
+  const outputs = steps.map((s) => outputsByRole.get(s.role)).filter((o): o is string => o !== undefined);
 
   const anyOk = results.some((x) => x.status === "ok");
   const status = !failed && !aborted && anyOk ? "ok" : "failed";
