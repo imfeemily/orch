@@ -1,4 +1,4 @@
-import type { TaskResult } from "../core/types.js";
+import type { TaskResult } from "./types.js";
 
 /** The plan of a dry run: one line per role with the agent and any skip reason. */
 export function formatPlan(result: TaskResult): string {

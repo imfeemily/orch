@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Deps, runTask } from "./orchestrator.js";
 import { type ReadinessChecker, contextBlocks } from "./readiness.js";
 import { type Handoff, type RoleSelection, buildRolePrompt, capHandoffs, extractHandoff, planRoles } from "./roles.js";
 import { pickRoleRoute } from "./router.js";
 import { selectRoles } from "./select-roles.js";
-import type { AgentName, Config, PlanStep, RoleResult, TaskResult, Usage } from "./types.js";
+import type { AgentName, Config, PlanStep, RoleConfig, RoleResult, TaskResult } from "./types.js";
+import { sumUsage } from "./usage.js";
 
 export interface TeamDeps extends Deps {
   readiness: ReadinessChecker;
@@ -19,6 +20,8 @@ export interface TeamRequest extends RoleSelection {
   context?: string;
   signal?: AbortSignal;
   onChunk?: (text: string) => void;
+  /** one line when a role of a team starts or finishes */
+  onProgress?: (text: string) => void;
   dryRun?: boolean;
   requireCodex?: boolean;
   keepGoing?: boolean;
@@ -29,14 +32,38 @@ export interface TeamRequest extends RoleSelection {
 
 /** Files (not directories, not dotfiles) an image role left in its assets directory. */
 function listAssets(dir: string): string[] {
+  let names: string[];
   try {
-    return readdirSync(dir)
-      .filter((f) => !f.startsWith(".") && statSync(join(dir, f)).isFile())
-      .sort()
-      .map((f) => join(dir, f));
+    names = readdirSync(dir);
   } catch {
     return [];
   }
+  return names
+    .filter((f) => {
+      if (f.startsWith(".")) return false;
+      try {
+        return lstatSync(join(dir, f)).isFile();
+      } catch {
+        return false;
+      }
+    })
+    .sort()
+    .map((f) => join(dir, f));
+}
+
+/** Why the flags a role would run with (agent base flags, its own, its context preset) block a capability. */
+function flagsBlock(config: Config, role: RoleConfig, agent: AgentName, context: string | undefined): string | undefined {
+  if (role.needs.length === 0) return undefined;
+  // The real command line is base args, then the preset's, then the role's: judge them in that order, last flag wins.
+  const lists: [string[] | undefined, string][] = [
+    [config.agents[agent].args, "the agent's flags"],
+    [config.contexts[context ?? role.context ?? ""]?.[agent], "context preset"],
+    [role.agentArgs?.[agent], "the role's flags"],
+  ];
+  const all = lists.flatMap(([a]) => a ?? []);
+  if (!contextBlocks(all, role.needs)) return undefined;
+  const source = [...lists].reverse().find(([a, label]) => contextBlocks(a, role.needs, label));
+  return contextBlocks(all, role.needs, source?.[1] ?? "the flags");
 }
 
 /**
@@ -66,24 +93,10 @@ const rejected = (message: string): TaskResult => ({
   message,
 });
 
-function sumUsage(usages: Array<Usage | undefined>): Usage | undefined {
-  const present = usages.filter((u): u is Usage => u !== undefined);
-  if (present.length === 0) return undefined;
-  return present.reduce<Usage>(
-    (a, u) => ({
-      inputTokens: a.inputTokens + u.inputTokens,
-      cacheReadTokens: a.cacheReadTokens + u.cacheReadTokens,
-      outputTokens: a.outputTokens + u.outputTokens,
-      ...(a.costUsd !== undefined || u.costUsd !== undefined ? { costUsd: (a.costUsd ?? 0) + (u.costUsd ?? 0) } : {}),
-    }),
-    { inputTokens: 0, cacheReadTokens: 0, outputTokens: 0 },
-  );
-}
-
 /** The assets directory of a run, created by orch for roles that need a capability. */
-function prepareAssets(cwd: string, runId: string, needed: boolean): { rel: string; abs: string } | undefined {
+function prepareAssets(cwd: string, runId: string, role: string, needed: boolean): { rel: string; abs: string } | undefined {
   if (!needed) return undefined;
-  const rel = join(".orch", "runs", runId, "assets");
+  const rel = join(".orch", "runs", runId, "assets", role);
   const abs = join(cwd, rel);
   try {
     mkdirSync(abs, { recursive: true });
@@ -93,8 +106,20 @@ function prepareAssets(cwd: string, runId: string, needed: boolean): { rel: stri
   return { rel, abs };
 }
 
+/** Keeps .orch/runs out of git from the first moment, so a role that runs while another writes assets does not see them as new files. */
+function ensureRunsIgnore(cwd: string): void {
+  try {
+    const runs = join(cwd, ".orch", "runs");
+    mkdirSync(runs, { recursive: true });
+    writeFileSync(join(runs, ".gitignore"), "*\n", { flag: "wx" });
+  } catch {
+    /* already there, or not writable: roles still run */
+  }
+}
+
 /** Saves a role's full answer under .orch/runs/<id>/; any filesystem problem just means no artifact. */
 function writeArtifact(cwd: string, runId: string, role: string, output: string): string | undefined {
+  if (output === "") return undefined;
   try {
     const runs = join(cwd, ".orch", "runs");
     const dir = join(runs, runId);
@@ -118,6 +143,9 @@ function writeArtifact(cwd: string, runId: string, role: string, output: string)
  */
 export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskResult> {
   const { config } = deps;
+  if (req.context !== undefined && !Object.hasOwn(config.contexts, req.context)) {
+    return rejected(`unknown context "${req.context}"; available: ${Object.keys(config.contexts).join(", ") || "(none)"}`);
+  }
   const noSelector = req.role === undefined && req.roles === undefined && req.team === undefined;
   if (noSelector) {
     const flags = [req.dryRun && "--dry-run", req.requireCodex && "--require-codex", req.keepGoing && "--keep-going", req.sequential && "--sequential"].filter(Boolean);
@@ -135,7 +163,7 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
     const agent = pickRoleRoute(config, role, req.task, () => false)?.agent ?? null;
     const step: PlanStep = { role: name, agent };
     if (role.needs.length > 0 && agent) {
-      const blocked = contextBlocks(config.contexts[req.context ?? role.context ?? ""]?.[agent], role.needs);
+      const blocked = flagsBlock(config, role, agent, req.context);
       if (blocked) {
         step.skipReason = blocked;
       } else {
@@ -181,7 +209,8 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
       return { ...rejected(`role "${step.role}" cannot run: ${step.skipReason}`), status: "failed" };
     }
     const role = config.roles[step.role];
-    const assets = prepareAssets(req.cwd, runId, role.needs.length > 0);
+    if (role.needs.length > 0) ensureRunsIgnore(req.cwd);
+    const assets = prepareAssets(req.cwd, runId, step.role, role.needs.length > 0);
     const prompt = buildRolePrompt(role, req.task, [], false, assets?.rel);
     const result = await runTask(deps, {
       prompt,
@@ -196,6 +225,7 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
     return assets ? { ...result, assets: listAssets(assets.abs) } : result;
   }
 
+  ensureRunsIgnore(req.cwd);
   const results: RoleResult[] = [];
   const outputsByRole = new Map<string, string>();
   const attempts: TaskResult["attempts"] = [];
@@ -206,13 +236,14 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
   let lastAgent: AgentName | null = null;
   const messages: string[] = [];
 
-  // Roles skipped when the plan was made do not take a place in any batch.
-  for (const step of steps.filter((s) => s.skipReason)) {
+  // In parallel mode, roles skipped when the plan was made take no place in any batch and are recorded
+  // up front. One at a time, they stay in plan order so an earlier failure or abort marks them not-run.
+  for (const step of parallelOn ? steps.filter((s) => s.skipReason) : []) {
     results.push({ role: step.role, agent: step.agent, status: "skipped", reason: step.skipReason });
     messages.push(`role "${step.role}" skipped: ${step.skipReason}`);
   }
 
-  for (const group of groupSteps(steps.filter((s) => !s.skipReason), config, parallelOn)) {
+  for (const group of groupSteps(parallelOn ? steps.filter((s) => !s.skipReason) : steps, config, parallelOn)) {
     if (req.signal?.aborted) aborted = true;
     if (aborted) {
       for (const step of group) results.push({ role: step.role, agent: step.agent, status: "not-run", reason: "cancelled" });
@@ -228,7 +259,7 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
     for (const step of group) {
       const role = config.roles[step.role];
       if (role.needs.length > 0 && step.agent) {
-        const blocked = contextBlocks(config.contexts[req.context ?? role.context ?? ""]?.[step.agent], role.needs);
+        const blocked = flagsBlock(config, role, step.agent, req.context);
         if (blocked) {
           step.skipReason = blocked;
         } else {
@@ -249,17 +280,25 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
     const done = await Promise.all(
       toRun.map(async (step) => {
         const role = config.roles[step.role];
-        const assets = prepareAssets(req.cwd, runId, role.needs.length > 0);
+        req.onProgress?.(`${step.role}: started (${step.agent ?? "-"})`);
+        const assets = prepareAssets(req.cwd, runId, step.role, role.needs.length > 0);
         const prompt = buildRolePrompt(role, req.task, snapshot, true, assets?.rel);
-        const r = await runTask(deps, {
-          prompt,
-          cwd: req.cwd,
-          depth: req.depth,
-          role: step.role,
-          runId,
-          context: req.context,
-          signal: req.signal,
-        });
+        let r: TaskResult;
+        try {
+          r = await runTask(deps, {
+            prompt,
+            cwd: req.cwd,
+            depth: req.depth,
+            role: step.role,
+            runId,
+            context: req.context,
+            signal: req.signal,
+          });
+        } catch (e) {
+          // a call that throws fails its role; it must not take its siblings' results with it
+          r = { status: "failed", agent: step.agent, output: "", failedOver: false, attempts: [], message: e instanceof Error ? e.message : String(e) };
+        }
+        req.onProgress?.(`${step.role}: ${r.status}`);
         return { step, assets, r };
       }),
     );
@@ -315,6 +354,8 @@ export async function runAuto(deps: TeamDeps, req: TeamRequest): Promise<TaskRes
   const selection = { roles: sel.roles, reasons: sel.reasons, dropped: sel.dropped };
 
   if (sel.roles.length === 0) {
+    const moot = [req.requireCodex && "--require-codex", req.keepGoing && "--keep-going", req.sequential && "--sequential"].filter(Boolean);
+    if (moot.length > 0) selection.reasons.push(`${moot.join(", ")} ignored: no roles were selected`);
     if (req.dryRun) {
       return {
         status: "planned",

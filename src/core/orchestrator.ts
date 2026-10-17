@@ -7,7 +7,7 @@ import { parseResetTime } from "./reset.js";
 import { type Route, otherAgent, pickRoleRoute, pickRoute } from "./router.js";
 import type { StateStore } from "./state.js";
 import type { AgentName, Attempt, Config, RunFn, TaskResult } from "./types.js";
-import type { Ledger } from "./usage.js";
+import { type Ledger, sumUsage } from "./usage.js";
 
 export interface Deps {
   config: Config;
@@ -63,6 +63,15 @@ async function requestSummary(
   return r.exitCode === 0 && text ? text : undefined;
 }
 
+/** Cooldown and job bookkeeping must never cost the user a finished answer. */
+function bestEffort(fn: () => void): void {
+  try {
+    fn();
+  } catch {
+    /* ignore */
+  }
+}
+
 export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult> {
   const { config, state, run } = deps;
   const now = deps.now ?? Date.now;
@@ -78,7 +87,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
 
   let contextName: string | undefined;
   const record = (res: TaskResult): TaskResult => {
-    state.appendJob({
+    bestEffort(() => state.appendJob({
       ...(contextName ? { context: contextName } : {}),
       ...(req.role ? { role: req.role } : {}),
       ...(route?.model && res.agent === route.agent ? { model: route.model } : {}),
@@ -87,7 +96,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       status: res.status,
       failedOver: res.failedOver,
       promptPreview: req.prompt.slice(0, 80),
-    });
+    }));
     return res;
   };
 
@@ -157,6 +166,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       // JSON agents print machine output; only plain-text agents are streamed live.
       onChunk: cfg.output === "text" ? req.onChunk : undefined,
       signal: req.signal,
+      ...(cfg.timeoutSec ? { timeoutMs: cfg.timeoutSec * 1000 } : {}),
     });
     const parsed = parseAgentOutput(cfg.output, result.stdout);
     // CLIs such as codex echo the prompt; remove it so our own handoff wording
@@ -170,7 +180,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     const outcome = classify(judged, cfg.limitPatterns, cfg.authPatterns);
     if (outcome === "limited") {
       const until = parseResetTime(relevantText(judged), now()) ?? now() + cfg.defaultCooldownSec * 1000;
-      state.setCooldown(agent, until);
+      bestEffort(() => state.setCooldown(agent, until));
     }
     const model = agent === first ? routedModel : undefined;
     const attempt: Attempt = {
@@ -191,7 +201,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       outcome,
       ...(parsed.usage ? { usage: parsed.usage } : {}),
       durationMs: now() - startedAt,
-      promptChars: req.prompt.length,
+      promptChars: prompt.length,
     });
     const streamed = cfg.output === "text" && req.onChunk !== undefined;
     return { text: parsed.text, detail: parsed.errorText ?? result.stderr, outcome, attempt, streamed };
@@ -205,7 +215,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       output: a1.text,
       failedOver: false,
       attempts: [a1.attempt],
-      usage: a1.attempt.usage,
+      usage: sumUsage([a1.attempt.usage]),
       streamed: a1.streamed,
     });
   }
@@ -270,7 +280,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     output: a2.text,
     failedOver: true,
     attempts: [a1.attempt, a2.attempt],
-    usage: a2.attempt.usage,
+    usage: sumUsage([a1.attempt.usage, a2.attempt.usage]),
     streamed: a2.streamed,
     message:
       a2.outcome === "ok"

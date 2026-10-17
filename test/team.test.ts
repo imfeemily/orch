@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -15,7 +15,7 @@ const READY: ReadinessChecker = async () => ({ ready: true, reasons: [] });
 const NOT_READY: ReadinessChecker = async () => ({ ready: false, reasons: ["not logged in: run `codex login`"] });
 
 function setup(
-  outputs: Record<string, RunResult>,
+  outputs: Record<string, RunResult | Error>,
   opts: {
     readiness?: ReadinessChecker;
     tweak?: (c: Config) => void;
@@ -45,6 +45,10 @@ function setup(
     inFlight--;
     events.push(`end:${role}`);
     const r = outputs[role] ?? ok(`${role} output\n## Handoff\n${role} handoff`);
+    if (r instanceof Error) {
+      inFlight--;
+      throw r;
+    }
     if (role === "developer") abort?.();
     if (opts.abortOn && role === opts.abortOn) ac.abort();
     return r;
@@ -85,6 +89,16 @@ describe("runRoles: single role", () => {
 });
 
 describe("runRoles: team", () => {
+  it("reports progress as each role starts and finishes, in a team only", async () => {
+    const s = setup({});
+    const lines: string[] = [];
+    await go(s, { roles: ["developer", "tester"] }, { onProgress: (t: string) => lines.push(t) });
+    expect(lines).toEqual(["developer: started (claude)", "developer: ok", "tester: started (claude)", "tester: ok"]);
+    const single: string[] = [];
+    await go(setup({}), { role: "reviewer" }, { onProgress: (t: string) => single.push(t) });
+    expect(single).toEqual([]);
+  });
+
   it("runs the standard team in order, passing handoffs forward and writing artifacts", async () => {
     const s = setup({});
     writeFileSync(join(s.cwd, ".gitignore"), "node_modules\n");
@@ -152,7 +166,7 @@ describe("runRoles: team", () => {
   });
 });
 
-const assetsOf = (prompt: string) => /(\.orch\/runs\/[a-z0-9-]+\/assets)/.exec(prompt)?.[1];
+const assetsOf = (prompt: string) => /(\.orch\/runs\/[a-z0-9-]+\/assets\/[a-z0-9_-]+)/i.exec(prompt)?.[1];
 
 describe("runRoles: image roles and assets", () => {
   const writeImage = (role: string, prompt: string, cwd: string) => {
@@ -165,10 +179,62 @@ describe("runRoles: image roles and assets", () => {
     const r = await go(s, { roles: ["developer", "pic"] });
     const pic = s.calls.find((c) => c.role === "pic")!;
     expect(pic.prompt).toContain("## Assets directory");
-    expect(assetsOf(pic.prompt)).toMatch(/^\.orch\/runs\/[a-z0-9-]+\/assets$/);
+    expect(assetsOf(pic.prompt)).toMatch(/^\.orch\/runs\/[a-z0-9-]+\/assets\/pic$/);
     expect(r.roles![1].assets!.map((p) => p.split("/").pop())).toEqual(["mockup.png"]);
     expect(s.calls.find((c) => c.role === "developer")!.prompt).not.toContain("## Assets directory");
     expect(r.roles![0].assets).toBeUndefined();
+  });
+
+  it("gives each image role its own folder, so a role is never credited with another's files", async () => {
+    const s = setup({}, {
+      tweak: (c) => { c.roles.pic2 = { prompt: "You are the second picture maker.", needs: ["image"], writes: false }; },
+      onRun: (role, prompt, cwd) => {
+        const rel = assetsOf(prompt);
+        if (rel && (role === "pic" || role === "pic2")) writeFileSync(join(cwd, rel, `${role}.png`), "x");
+      },
+    });
+    const r = await go(s, { roles: ["pic", "pic2"] });
+    const files = (role: string) => r.roles!.find((x) => x.role === role)!.assets!.map((p) => p.split("/").pop());
+    expect(files("pic")).toEqual(["pic.png"]);
+    expect(files("pic2")).toEqual(["pic2.png"]);
+  });
+
+  it("lists only real files: a dangling symlink or a link to an outside file neither hides nor adds assets", async () => {
+    const s = setup({}, {
+      onRun: (role, prompt, cwd) => {
+        const rel = assetsOf(prompt);
+        if (role !== "pic" || !rel) return;
+        writeFileSync(join(cwd, rel, "real.png"), "x");
+        symlinkSync("/nonexistent/target", join(cwd, rel, "dangling.png"));
+        symlinkSync(join(cwd, "..", "outside.txt"), join(cwd, rel, "outside.png"));
+      },
+    });
+    writeFileSync(join(s.cwd, "..", "outside.txt"), "secret");
+    const r = await go(s, { roles: ["pic"] });
+    expect(r.roles![0].assets!.map((p) => p.split("/").pop())).toEqual(["real.png"]);
+  });
+
+  it("skips an image role whose own flags (or the agent's base flags) disable image generation", async () => {
+    const s = setup({}, {
+      tweak: (c) => { c.roles.pic.agentArgs = { codex: ["-c", "features.image_generation=false"] }; },
+    });
+    const r = await go(s, { roles: ["developer", "pic"] });
+    expect(r.roles![1]).toMatchObject({ role: "pic", status: "skipped" });
+    expect(r.roles![1].reason).toContain("disables image generation");
+    const s2 = setup({}, { tweak: (c) => { c.agents.codex.args = ["exec", "--disable", "image_generation", "--", "{prompt}"]; } });
+    const r2 = await go(s2, { roles: ["pic"] }, { dryRun: true });
+    expect(r2.plan![0].skipReason).toContain("disables image generation");
+  });
+
+  it("honours flag order across base args, context and role: the role's later --enable beats the preset's --disable", async () => {
+    const s = setup({}, {
+      tweak: (c) => {
+        c.contexts.off = { codex: ["--disable", "image_generation"] };
+        c.roles.pic.agentArgs = { codex: ["--enable", "image_generation"] };
+      },
+    });
+    const r = await go(s, { roles: ["pic"] }, { context: "off", dryRun: true });
+    expect(r.plan![0].skipReason).toBeUndefined();
   });
 
   it("reports an empty list when the role left no files, and never invents files from its text", async () => {
@@ -192,6 +258,55 @@ describe("runRoles: image roles and assets", () => {
     expect(run.roles![1]).toMatchObject({ role: "pic", status: "skipped" });
     expect(run.roles![1].reason).toContain("disables image generation");
     expect(s.calls.map((c) => c.role)).toEqual(["developer"]);
+  });
+});
+
+describe("runRoles: robustness", () => {
+  const tweak = (c: Config) => {
+    c.teams.par = ["developer", "reviewer", "security"];
+  };
+
+  it("creates the artifacts folder's .gitignore before the first role runs", async () => {
+    let existed: boolean[] = [];
+    const s = setup({}, { onRun: (_r, _p, cwd) => { existed.push(existsSync(join(cwd, ".orch", "runs", ".gitignore"))); } });
+    await go(s, { team: "standard" });
+    expect(existed).toEqual([true, true, true]);
+  });
+
+  it("does not write an artifact for a role that produced no output", async () => {
+    const s = setup({ developer: FAIL });
+    const r = await go(s, { team: "standard" });
+    expect(r.roles![0].status).toBe("failed");
+    expect(r.roles![0].artifact).toBeUndefined();
+  });
+
+  it("rejects an unknown context up front, in a run and in a dry run", async () => {
+    const s = setup({});
+    for (const extra of [{ context: "nope" }, { context: "nope", dryRun: true }]) {
+      const r = await go(s, { team: "standard" }, extra);
+      expect(r.status).toBe("rejected");
+      expect(r.message).toContain("nope");
+      expect(r.message).toContain("lean");
+    }
+    expect(s.calls).toHaveLength(0);
+  });
+
+  it("keeps a failing role from losing its sibling's result when a call throws", async () => {
+    const s = setup({ reviewer: new Error("disk full") }, { tweak, delays: { security: 20 } });
+    const r = await go(s, { team: "par" });
+    expect(r.roles!.map((x) => [x.role, x.status])).toEqual([["developer", "ok"], ["reviewer", "failed"], ["security", "ok"]]);
+    expect(r.roles![1].reason).toContain("disk full");
+    expect(r.status).toBe("failed");
+  });
+
+  it("with sequential, a role skipped at plan time after a failure is not-run, as before; in parallel mode it stays skipped", async () => {
+    const readiness: ReadinessChecker = async (agent) => (agent === "codex" ? { ready: false, reasons: ["not logged in"] } : { ready: true, reasons: [] });
+    const seq = setup({ developer: FAIL }, { readiness });
+    const rs = await go(seq, { roles: ["developer", "pic", "reviewer"] }, { sequential: true });
+    expect(rs.roles!.map((x) => [x.role, x.status])).toEqual([["developer", "failed"], ["pic", "not-run"], ["reviewer", "not-run"]]);
+    const par = setup({ developer: FAIL }, { readiness });
+    const rp = await go(par, { roles: ["developer", "pic", "reviewer"] });
+    expect(rp.roles!.map((x) => [x.role, x.status])).toEqual([["developer", "failed"], ["pic", "skipped"], ["reviewer", "not-run"]]);
   });
 });
 
@@ -358,6 +473,14 @@ describe("runAuto", () => {
     const q = await auto(s, "what does clamp do", { dryRun: true });
     expect(q.status).toBe("planned");
     expect(q.message).toContain("plain");
+  });
+
+  it("says in the selection when a question made --require-codex and --keep-going moot", async () => {
+    const s = setup({});
+    const r = await auto(s, "what does clamp do", { requireCodex: true, keepGoing: true });
+    expect(r.selection!.reasons.join(" ")).toMatch(/--require-codex.*--keep-going.*ignored/);
+    const quiet = await auto(setup({}), "what does clamp do");
+    expect(quiet.selection!.reasons.join(" ")).not.toContain("ignored");
   });
 
   it("rejects an explicit selector and allows role-only flags", async () => {

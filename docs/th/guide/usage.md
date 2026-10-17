@@ -39,6 +39,8 @@ orch explain "แก้ typo ใน README"                             # --auto
 - `--dry-run` แสดง role เอเจนต์ของมัน และจำนวนการเรียก model โดยไม่รันอะไร
 - `--require-codex` หยุดก่อนเริ่มเมื่อมี role ที่ต้องใช้ Codex และ Codex ไม่พร้อม ถ้าไม่ใส่ role นั้นจะถูกข้าม
 - `--keep-going` รัน role ที่เหลือต่อหลังมี role ล้ม ค่าเริ่มต้นทีมจะหยุด
+- `--` ปิดส่วน option: ทุกอย่างหลังจากนั้นคือ prompt แม้เป็นคำที่ขึ้นต้นด้วย `--` (`orch run -- "explain what --force does"`)
+- การรันแบบ team พิมพ์ความคืบหน้าหนึ่งบรรทัดต่อ role ที่ stderr (`orch: developer: started (claude)`, `orch: developer: ok`) คำตอบยังไปที่ stdout
 - `--sequential` รันทีละ role โดยค่าเริ่มต้น role อ่านอย่างเดียวที่อยู่ติดกัน (เช่น `reviewer` กับ `security`) รันขนานกัน ซึ่งประหยัดเวลาแต่ไม่ประหยัดโทเค่น
 
 ดู [Roles](/th/guide/roles) สำหรับหน้าที่ของแต่ละ role, handoff และไฟล์ที่บันทึก
@@ -54,9 +56,10 @@ orch usage --by context            # เทียบ context preset
 orch usage --by role               # ต้นทุนของแต่ละ role
 ```
 
+- `tasks` นับจำนวนงานที่ต่างกัน (failover ยังนับเป็นงานเดียว และการรัน team ทั้งชุดนับเป็นหนึ่งงาน) ส่วน `tokens` รวมทุก attempt ของงานเหล่านั้น รวมครั้งที่ล้มก่อน failover
 - ตัวเลขโทเค่นคือ *billable tokens*: input ที่ไม่รวม cache read บวก output (reasoning รวมอยู่ใน output แล้ว) เป็นค่าประมาณไว้ติดตามโควต้า ไม่ใช่การนับของผู้ให้บริการ
 - Claude รายงานค่าใช้จ่ายเป็น USD ด้วย ส่วน Codex รายงานเฉพาะโทเค่น
-- `orch status` แสดงยอด 24 ชั่วโมงล่าสุดต่อเอเจนต์ และผลของ MCP `orch_run` ปิดท้ายด้วย `tokens=<n>`
+- `orch status` แสดงยอด 24 ชั่วโมงล่าสุดต่อเอเจนต์ และผลของ MCP `orch_run` ปิดท้ายด้วย `tokens=<n>` (โทเค่นที่คิดเงินได้ของทุก attempt)
 - เอเจนต์ถูกเรียกในโหมด JSON (`--output-format json` ของ Claude, `--json` ของ Codex) ดังนั้น `orch run` จะพิมพ์เฉพาะคำตอบสุดท้ายหนึ่งครั้งเมื่อเอเจนต์ทำงานเสร็จ
 
 ## จาก Claude Code และ Codex (MCP)

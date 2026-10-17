@@ -105,6 +105,16 @@ describe("contextBlocks", () => {
     );
   });
 
+  it("understands the other ways of turning the feature off or on, and the last flag wins", () => {
+    const off = "context preset disables image generation";
+    expect(contextBlocks(["--disable=image_generation"], ["image"])).toBe(off);
+    expect(contextBlocks(["-c", "features.image_generation=false"], ["image"])).toBe(off);
+    expect(contextBlocks(["--config", "features.image_generation=false"], ["image"])).toBe(off);
+    expect(contextBlocks(["--disable", "image_generation", "--enable", "image_generation"], ["image"])).toBeUndefined();
+    expect(contextBlocks(["-c", "features.image_generation=false", "-c", "features.image_generation=true"], ["image"])).toBeUndefined();
+    expect(contextBlocks(["--disable", "image_generation"], ["image"], "the agent's flags")).toBe("the agent's flags disables image generation");
+  });
+
   it("does not block without the capability, for other features, or without args", () => {
     expect(contextBlocks(["--disable", "image_generation"], [])).toBeUndefined();
     expect(contextBlocks(["--disable", "hooks"], ["image"])).toBeUndefined();

@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, statSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -42,6 +42,30 @@ describe("daemon", () => {
     expect(chunks).toEqual(["part1 "]);
     expect(final.type).toBe("result");
     if (final.type === "result") expect(final.result.status).toBe("ok");
+  });
+
+  it("treats a just-created empty start lock as held, and a lock older than 10s as stale even if its pid is alive", async () => {
+    const s = setup(okRun);
+    const lock = `${s.sockPath}.lock`;
+    writeFileSync(lock, "");
+    await expect(startDaemon({ sockPath: s.sockPath, deps: s.deps })).rejects.toThrow(/already starting/);
+    writeFileSync(lock, String(process.pid));
+    const old = new Date(Date.now() - 60_000);
+    utimesSync(lock, old, old);
+    closers.push((await startDaemon({ sockPath: s.sockPath, deps: s.deps })).close);
+  });
+
+  it("sends progress messages that are not the final reply", async () => {
+    const s = setup(okRun);
+    closers.push((await startDaemon({ sockPath: s.sockPath, deps: s.deps })).close);
+    const progress: string[] = [];
+    const final = await sendRequest(
+      s.sockPath,
+      { type: "run", prompt: "hello", cwd: s.dir, depth: 0, team: "quick" },
+      (m) => m.type === "progress" && progress.push(m.text),
+    );
+    expect(final.type).toBe("result");
+    expect(progress.some((l) => l.startsWith("developer: started"))).toBe(true);
   });
 
   it("forwards context to the run and reports an unknown context as rejected", async () => {
@@ -144,6 +168,66 @@ describe("daemon", () => {
     expect(max).toBe(1);
     const alone = await sendRequest(s.sockPath, { type: "run", prompt: "x", cwd: s.dir, depth: 0, sequential: true }, () => {});
     expect(alone.type === "result" && alone.result.status).toBe("rejected");
+  });
+
+  it("reads a request whose multi-byte character is split across packets", async () => {
+    const seen: string[] = [];
+    const run: RunFn = async (_c, _a, prompt) => {
+      seen.push(prompt);
+      return { exitCode: 0, stdout: "ok", stderr: "" };
+    };
+    const s = setup(run);
+    closers.push((await startDaemon({ sockPath: s.sockPath, deps: s.deps })).close);
+    const bytes = Buffer.from(`${JSON.stringify({ type: "run", prompt: "ก", cwd: s.dir, depth: 0 })}\n`);
+    const cut = bytes.indexOf(0xe0) + 1;
+    await new Promise<void>((resolve) => {
+      const c = net.connect(s.sockPath, () => {
+        c.write(bytes.subarray(0, cut));
+        setTimeout(() => c.write(bytes.subarray(cut)), 60);
+      });
+      c.on("data", () => {
+        c.destroy();
+        resolve();
+      });
+    });
+    expect(seen).toEqual(["ก"]);
+  });
+
+  it("leaves a newer daemon's socket alone when an older daemon finishes shutting down late", async () => {
+    const s = setup(okRun);
+    const older = await startDaemon({ sockPath: s.sockPath, deps: s.deps });
+    // an open connection keeps the older daemon's shutdown from completing
+    const held = net.connect(s.sockPath);
+    await new Promise<void>((r) => held.once("connect", () => r()));
+    const closing = older.close(); // stops listening and frees the path at once
+    await new Promise((r) => setTimeout(r, 30));
+    const newer = await startDaemon({ sockPath: s.sockPath, deps: s.deps });
+    closers.push(newer.close);
+    held.destroy(); // now the older daemon's close completes and runs its own cleanup
+    await closing;
+    expect(await isAlive(s.sockPath)).toBe(true);
+  });
+
+  it("lets only one of two daemons that start at the same time win", async () => {
+    const s = setup(okRun);
+    const results = await Promise.allSettled([
+      startDaemon({ sockPath: s.sockPath, deps: s.deps }),
+      startDaemon({ sockPath: s.sockPath, deps: s.deps }),
+    ]);
+    const won = results.filter((r) => r.status === "fulfilled");
+    expect(won).toHaveLength(1);
+    const lost = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+    expect(String(lost.reason)).toMatch(/already (running|starting)/);
+    closers.push((won[0] as PromiseFulfilledResult<{ close(): Promise<void> }>).value.close);
+    expect(await isAlive(s.sockPath)).toBe(true);
+  });
+
+  it("tightens an existing state directory to owner-only", async () => {
+    const s = setup(okRun);
+    mkdirSync(s.dir, { recursive: true });
+    chmodSync(s.dir, 0o755);
+    closers.push((await startDaemon({ sockPath: s.sockPath, deps: s.deps })).close);
+    expect(statSync(s.dir).mode & 0o777).toBe(0o700);
   });
 
   it("answers status", async () => {

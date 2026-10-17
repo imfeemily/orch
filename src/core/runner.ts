@@ -39,13 +39,15 @@ export const runCommand: RunFn = (command, args, prompt, opts) =>
     if (opts.signal?.aborted) onAbort();
     else opts.signal?.addEventListener("abort", onAbort, { once: true });
 
-    child.stdout.on("data", (b: Buffer) => {
-      const text = b.toString();
+    // setEncoding decodes across chunk boundaries, so a multi-byte character is never split.
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (text: string) => {
       stdout += text;
       opts.onChunk?.(text);
     });
-    child.stderr.on("data", (b: Buffer) => {
-      stderr += b.toString();
+    child.stderr.on("data", (text: string) => {
+      stderr += text;
     });
     child.on("error", (err) =>
       finish({ exitCode: null, stdout, stderr: `orch: failed to start ${command}: ${err.message}` }),

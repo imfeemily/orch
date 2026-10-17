@@ -21,6 +21,7 @@ export type Request =
 
 export type Message =
   | { type: "chunk"; text: string }
+  | { type: "progress"; text: string }
   | { type: "result"; result: TaskResult }
   | { type: "status"; cooldowns: Partial<Record<AgentName, number>>; jobs: JobEntry[] }
   | { type: "ok" }

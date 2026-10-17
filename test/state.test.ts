@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -18,6 +18,12 @@ const job = (n: number): JobEntry => ({
 });
 
 describe("StateStore", () => {
+  it("writes the state file readable by its owner only", () => {
+    const p = storePath();
+    new StateStore(p).setCooldown("claude", 5);
+    expect(statSync(p).mode & 0o777).toBe(0o600);
+  });
+
   it("starts with no cooldowns", () => {
     const s = new StateStore(storePath());
     expect(s.isCooling("claude", 1000)).toBe(false);

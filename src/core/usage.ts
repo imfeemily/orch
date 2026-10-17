@@ -27,7 +27,7 @@ export class Ledger {
   append(entry: LedgerEntry): void {
     try {
       mkdirSync(dirname(this.path), { recursive: true, mode: 0o700 });
-      appendFileSync(this.path, `${JSON.stringify(entry)}\n`);
+      appendFileSync(this.path, `${JSON.stringify(entry)}\n`, { mode: 0o600 });
     } catch {
       /* ignore */
     }
@@ -62,7 +62,7 @@ export class Ledger {
     try {
       const kept = this.readAll().filter((e) => e.at >= now - keepMs);
       const tmp = `${this.path}.${process.pid}.tmp`;
-      writeFileSync(tmp, kept.map((e) => `${JSON.stringify(e)}\n`).join(""));
+      writeFileSync(tmp, kept.map((e) => `${JSON.stringify(e)}\n`).join(""), { mode: 0o600 });
       renameSync(tmp, this.path);
     } catch {
       /* ignore */
@@ -80,15 +80,44 @@ export interface UsageRow {
   costUsd: number;
 }
 
+/** Adds token fields and cost; undefined when no entry has usage. */
+export function sumUsage(usages: Array<Usage | undefined>): Usage | undefined {
+  const present = usages.filter((u): u is Usage => u !== undefined);
+  if (present.length === 0) return undefined;
+  return present.reduce<Usage>(
+    (a, u) => ({
+      inputTokens: a.inputTokens + u.inputTokens,
+      cacheReadTokens: a.cacheReadTokens + u.cacheReadTokens,
+      outputTokens: a.outputTokens + u.outputTokens,
+      ...(a.costUsd !== undefined || u.costUsd !== undefined ? { costUsd: (a.costUsd ?? 0) + (u.costUsd ?? 0) } : {}),
+    }),
+    { inputTokens: 0, cacheReadTokens: 0, outputTokens: 0 },
+  );
+}
+
+/**
+ * Trims the ledger on an interval so a long-running daemon does not let it grow. Only the daemon
+ * writes the file and `append` and `trim` are synchronous, so they never interleave.
+ */
+export function scheduleTrim(ledger: Ledger, keepMs: number, everyMs: number): NodeJS.Timeout {
+  const timer = setInterval(() => ledger.trim(keepMs), everyMs);
+  timer.unref();
+  return timer;
+}
+
 export function summarize(entries: LedgerEntry[], by: "agent" | "model" | "context" | "role"): UsageRow[] {
   const rows = new Map<string, UsageRow>();
+  const tasks = new Map<string, Set<string>>();
   for (const e of entries) {
     const key =
       by === "agent" ? e.agent : by === "model" ? (e.model ?? "(default)") : by === "context" ? (e.context ?? "(none)") : (e.role ?? "(none)");
     const row =
       rows.get(key) ??
       { key, tasks: 0, inputTokens: 0, cacheReadTokens: 0, outputTokens: 0, billableTokens: 0, costUsd: 0 };
-    row.tasks += 1;
+    const seen = tasks.get(key) ?? new Set<string>();
+    seen.add(e.taskId);
+    tasks.set(key, seen);
+    row.tasks = seen.size;
     if (e.usage) {
       row.inputTokens += e.usage.inputTokens;
       row.cacheReadTokens += e.usage.cacheReadTokens;

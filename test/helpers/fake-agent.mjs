@@ -24,3 +24,12 @@ if (mode === "depth") {
 if (mode === "sleep") {
   setTimeout(() => {}, 60000);
 }
+
+if (mode === "split-utf8") {
+  // the Thai letter "ก" is the three bytes e0 b8 81; send it in two writes
+  process.stdout.write(Buffer.from([0xe0, 0xb8]));
+  setTimeout(() => {
+    process.stdout.write(Buffer.from([0x81, 0x0a]));
+    process.exit(0);
+  }, 80);
+}

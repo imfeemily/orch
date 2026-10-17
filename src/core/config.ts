@@ -301,6 +301,10 @@ function validate(cfg: Config): void {
     if (!OUTPUT_KINDS.includes(cfg.agents[name].output)) {
       throw new Error(`agents.${name}.output must be one of ${OUTPUT_KINDS.join(", ")}`);
     }
+    const t = cfg.agents[name].timeoutSec;
+    if (t !== undefined && !(typeof t === "number" && t > 0 && t * 1000 <= 2_147_483_647)) {
+      throw new Error(`agents.${name}.timeoutSec must be a positive number of seconds (at most 2147483)`);
+    }
     cfg.agents[name].limitPatterns.forEach(assertRegex);
     cfg.agents[name].authPatterns.forEach(assertRegex);
   }

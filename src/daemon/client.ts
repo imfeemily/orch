@@ -22,6 +22,7 @@ export function sendRequest(
 ): Promise<Message> {
   return new Promise((resolve, reject) => {
     const socket = net.connect(sockPath);
+    socket.setEncoding("utf8");
     let buf = "";
     let done = false;
     socket.on("connect", () => socket.write(`${JSON.stringify(req)}\n`));
@@ -33,7 +34,7 @@ export function sendRequest(
         buf = buf.slice(i + 1);
         if (!line.trim()) continue;
         const msg = JSON.parse(line) as Message;
-        if (msg.type === "chunk") {
+        if (msg.type === "chunk" || msg.type === "progress") {
           onChunk(msg);
         } else {
           done = true;

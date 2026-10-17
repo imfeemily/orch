@@ -7,7 +7,7 @@ import { Ledger, billableTokens, parseDuration, summarize } from "../core/usage.
 import { finalOutputToPrint } from "./render.js";
 import { loadConfig } from "../core/config.js";
 import { selectRoles } from "../core/select-roles.js";
-import { formatAssets, formatPlan, formatRoles, formatSelection } from "./plan-report.js";
+import { formatAssets, formatPlan, formatRoles, formatSelection } from "../core/plan-report.js";
 import { formatUsage } from "./usage-report.js";
 import { USAGE } from "./usage.js";
 
@@ -96,6 +96,7 @@ async function main(): Promise<number> {
         },
         (m) => {
           if (m.type === "chunk") process.stdout.write(m.text);
+          else if (m.type === "progress") process.stderr.write(`orch: ${m.text}\n`);
         },
       );
       if (final.type === "error") throw new Error(final.message);

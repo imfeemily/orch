@@ -37,6 +37,10 @@ export function parseArgs(argv: string[]): Command {
     let auto: boolean | undefined;
     const words: string[] = [];
     for (let i = 0; i < rest.length; i++) {
+      if (rest[i] === "--") {
+        words.push(...rest.slice(i + 1)); // everything after -- is the prompt, even words that look like flags
+        break;
+      }
       if (rest[i] === "--cwd") {
         cwd = rest[++i];
         if (!cwd) throw new Error("--cwd requires a directory");

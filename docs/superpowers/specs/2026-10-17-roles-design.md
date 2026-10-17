@@ -100,7 +100,7 @@ Validation at load: unknown `context`, unknown capability in `needs`, a team nam
   `.orch/runs/<run-id>/<role>.md` and keeps the handoff text (fallback: the last 1,500 characters) for later roles.
 - Summaries passed to a role are capped by `pipeline.handoffChars` (default 4,000) in total, newest first.
 - `.orch/runs/` is created with its own `.gitignore` containing `*`; the user's `.gitignore` is never edited. Image and diagram
-  files a role creates are saved under `.orch/runs/<run-id>/assets/`.
+  files a role creates are saved under `.orch/runs/<run-id>/assets/<role>/`.
 - Writers (`writes: true`) run one at a time. Phase 3 lets adjacent read-only roles (reviewer and security) run in parallel.
 - **Failure:** a role that fails after failover stops the pipeline and the result lists finished, failed and not-run roles.
   `--keep-going` continues with the remaining roles. A skipped role (readiness) is not a failure.
@@ -129,16 +129,15 @@ Text diagrams (Mermaid) written by the architecture role do not need Codex and a
 - A question or explanation with no change intent (explain, what, where, why, how does) selects **no roles**: it runs as a plain
   call, the cheapest path.
 - Otherwise `developer` is always chosen, plus any of these when their words appear in the prompt (word lists are defaults in
-  code and overridable under `auto.keywords`):
+  code and extended under `auto.keywords`, which adds to the built-in words):
   - `tester`: test, bug, fix, regression, feature, implement
-  - `reviewer`: refactor, migrate, implement, feature, large (also when the prompt is long)
+  - `reviewer`: refactor, migrate, implement, feature (also when the prompt is long)
   - `security`: auth, login, token, password, secret, crypto, sql, upload, permission, payment
   - `architecture`: architecture, design the, module, boundary, api design, migrate
   - `designer`: ui, ux, screen, layout, mockup, wireframe, diagram, image, logo
 - If more than `auto.maxRoles` match, keep the highest-priority ones: developer, then security, tester, reviewer,
   architecture, designer. The dropped roles are listed in the reasons.
-- `orch explain "<prompt>"` prints the selection and reasons without running anything. A normal auto run prints one line:
-  `orch: roles developer, tester, reviewer (auto)`.
+- `orch explain "<prompt>"` prints the selection and reasons without running anything. A normal auto run prints `auto: roles developer, tester, reviewer` and the reasons on stderr.
 
 ## Data model and interfaces
 
