@@ -164,6 +164,16 @@ describe("loadConfig", () => {
     bad("auto:\n  keywords:\n    security: pii\n", /auto\.keywords\.security/);
   });
 
+  it("rejects an auto or pipeline block that is not a mapping, unknown keys, and non-mapping keywords", () => {
+    const bad = (yaml: string, re: RegExp) => expect(() => loadConfig(tmpFile(yaml))).toThrow(re);
+    bad("auto: true\n", /auto must be a mapping/);
+    bad("auto: [a, b]\n", /auto must be a mapping/);
+    bad("auto:\n  max_roles: 1\n", /auto\.max_roles/);
+    bad("auto:\n  keywords: []\n", /auto\.keywords/);
+    bad("pipeline: true\n", /pipeline must be a mapping/);
+    bad("pipeline:\n  handoff: 10\n", /pipeline\.handoff/);
+  });
+
   it("merges user roles and teams over the defaults by name and key", () => {
     const cfg = loadConfig(
       tmpFile(

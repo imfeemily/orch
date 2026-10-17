@@ -71,6 +71,12 @@ describe("mcp server", () => {
     })) as { content: Array<{ text: string }>; isError?: boolean };
     expect(auto.isError).toBeFalsy();
     expect(auto.content[0].text).toContain("auto=developer,tester");
+
+    const capped = (await client.callTool({
+      name: "orch_run",
+      arguments: { prompt: "implement login with a password reset token", cwd: home, auto: true },
+    })) as { content: Array<{ text: string }> };
+    expect(capped.content[0].text).toContain("dropped=reviewer");
     expect(res.content[0].text).not.toContain("input_tokens");
   }, 20_000);
 });

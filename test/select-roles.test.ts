@@ -14,6 +14,44 @@ describe("selectRoles", () => {
     }
   });
 
+  it("recognises questions without a leading question word, with a question mark, and in Thai", () => {
+    for (const p of [
+      "Is there a bug in auth.ts?",
+      "How is the token validated?",
+      "Can you tell me how the login token is refreshed?",
+      "What should I change in the router?",
+      "how do I fix the login bug?",
+      "อธิบายว่าโค้ดนี้ทำงานอย่างไร",
+      "ทำไม login ถึงช้า",
+    ]) {
+      expect(selectRoles(cfg(), p).roles, p).toEqual([]);
+    }
+  });
+
+  it("still treats polite requests and Thai change requests as changes", () => {
+    expect(selectRoles(cfg(), "Can you add a login page?").roles).toContain("developer");
+    expect(selectRoles(cfg(), "please fix the parser").roles).toContain("developer");
+    expect(selectRoles(cfg(), "เพิ่มปุ่ม login ในหน้าแรก").roles).toContain("developer");
+  });
+
+  it("matches common word endings (plurals, -ing, -ed, -ies)", () => {
+    expect(selectRoles(cfg(), "add unit tests for the parser").roles).toContain("tester");
+    const s = selectRoles(cfg({ maxRoles: 6 }), "Implementing new features for payments");
+    expect(s.roles).toEqual(expect.arrayContaining(["developer", "tester", "reviewer", "security"]));
+    expect(selectRoles(cfg({ maxRoles: 6 }), "migrating the module").roles).toContain("architecture");
+    expect(selectRoles(cfg({ maxRoles: 6 }), "clarify the module boundaries").roles).toContain("architecture");
+    expect(selectRoles(cfg(), "update the contests page").roles).toEqual(["developer"]);
+  });
+
+  it("selects custom roles from auto.keywords, after the built-in ones", () => {
+    const base = cfg({ keywords: { docs: ["readme"] }, maxRoles: 6 });
+    const config: Config = { ...base, roles: { ...base.roles, docs: { prompt: "docs", needs: [], writes: true } } };
+    const s = selectRoles(config, "update the readme and fix the login bug");
+    expect(s.roles).toContain("docs");
+    expect(s.roles[s.roles.length - 1]).toBe("docs");
+    expect(s.reasons.join(" ")).toContain('docs: matched "readme"');
+  });
+
   it("treats a question that also asks for a change as a change", () => {
     expect(selectRoles(cfg(), "how do I fix the login bug").roles).toContain("developer");
   });

@@ -171,6 +171,22 @@ function mergeRoles(user: unknown): Record<string, RoleConfig> {
   return merged;
 }
 
+function plainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function mergeKnown<T extends object>(name: string, defaults: T, user: unknown, known: string[]): T {
+  if (user === undefined || user === null) return structuredClone(defaults);
+  if (!plainObject(user)) throw new Error(`${name} must be a mapping (${known.join(", ")})`);
+  for (const key of Object.keys(user)) {
+    if (!known.includes(key)) throw new Error(`${name}.${key} is not a known setting (use ${known.join(", ")})`);
+  }
+  if (name === "auto" && user.keywords !== undefined && !plainObject(user.keywords)) {
+    throw new Error("auto.keywords must map role names to word lists");
+  }
+  return { ...structuredClone(defaults), ...user } as T;
+}
+
 export function loadConfig(path?: string): Config {
   const file = path ?? process.env.ORCH_CONFIG ?? join(orchHome(), "config.yaml");
   if (!existsSync(file)) return structuredClone(DEFAULT_CONFIG);
@@ -185,8 +201,8 @@ export function loadConfig(path?: string): Config {
     contexts: mergeContexts(raw.contexts),
     roles: mergeRoles(raw.roles),
     teams: { ...structuredClone(DEFAULT_CONFIG.teams), ...(raw.teams ?? {}) },
-    pipeline: { ...DEFAULT_CONFIG.pipeline, ...(raw.pipeline ?? {}) },
-    auto: { ...DEFAULT_CONFIG.auto, ...(raw.auto ?? {}) },
+    pipeline: mergeKnown("pipeline", DEFAULT_CONFIG.pipeline, raw.pipeline, ["handoffChars"]),
+    auto: mergeKnown("auto", DEFAULT_CONFIG.auto, raw.auto, ["enabled", "maxRoles", "keywords"]),
   };
   validate(cfg);
   return cfg;

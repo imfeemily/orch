@@ -45,7 +45,7 @@ server.tool(
     if (r.status === "planned") return text(`${r.selection ? `${formatSelection(r.selection)}\n` : ""}${formatPlan(r)}`);
     const footer = `\n\n[orch] status=${r.status} agent=${r.agent ?? "-"} failedOver=${r.failedOver}${r.usage ? ` tokens=${billableTokens(r.usage)}` : ""}${
       r.roles ? ` roles=${r.roles.map((x) => `${x.role}:${x.status}`).join(",")}` : ""
-    }${r.selection ? ` auto=${r.selection.roles.join(",") || "none"}` : ""}${
+    }${r.selection ? ` auto=${r.selection.roles.join(",") || "none"}${r.selection.dropped.length ? ` dropped=${r.selection.dropped.join(",")}` : ""}` : ""}${
       [...(r.assets ?? []), ...(r.roles ?? []).flatMap((x) => x.assets ?? [])].length ? ` assets=${[...(r.assets ?? []), ...(r.roles ?? []).flatMap((x) => x.assets ?? [])].join(",")}` : ""
     }${
       r.message ? ` message=${r.message}` : ""
