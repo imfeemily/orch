@@ -23,6 +23,8 @@ export interface TaskRequest {
   depth: number;
   onChunk?: (text: string) => void;
   signal?: AbortSignal;
+  /** name of a `contexts` preset; overrides the matching rule's */
+  context?: string;
 }
 
 const LOGIN_HINT: Record<AgentName, string> = {
@@ -70,8 +72,10 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       )
       .join(", ");
 
+  let contextName: string | undefined;
   const record = (res: TaskResult): TaskResult => {
     state.appendJob({
+      ...(contextName ? { context: contextName } : {}),
       ...(route?.model && res.agent === route.agent ? { model: route.model } : {}),
       at: now(),
       agent: res.agent,
@@ -93,6 +97,17 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     };
   }
 
+  if (req.context !== undefined && !Object.hasOwn(config.contexts, req.context)) {
+    return {
+      status: "rejected",
+      agent: null,
+      output: "",
+      failedOver: false,
+      attempts: [],
+      message: `unknown context "${req.context}"; available: ${Object.keys(config.contexts).join(", ") || "(none)"}`,
+    };
+  }
+
   const route = pickRoute(config, req.prompt, cooling);
   if (!route) {
     return record({
@@ -105,13 +120,15 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     });
   }
 
+  contextName = req.context ?? route.context;
   const first = route.agent;
   const routedModel = route.model;
   const taskId = randomUUID().slice(0, 8);
   const runAttempt = async (agent: AgentName, prompt: string, choice: Route = { agent }) => {
     const cfg = config.agents[agent];
     const startedAt = now();
-    const result = await run(cfg.command, buildAgentArgs(cfg, choice), prompt, {
+    const contextArgs = contextName ? config.contexts[contextName]?.[agent] : undefined;
+    const result = await run(cfg.command, buildAgentArgs(cfg, { ...choice, contextArgs }), prompt, {
       cwd: req.cwd,
       depth: req.depth,
       // JSON agents print machine output; only plain-text agents are streamed live.
@@ -146,6 +163,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       taskId,
       agent,
       ...(model ? { model } : {}),
+      ...(contextName ? { context: contextName } : {}),
       outcome,
       ...(parsed.usage ? { usage: parsed.usage } : {}),
       durationMs: now() - startedAt,

@@ -8,6 +8,8 @@
 | `Not inside a trusted directory` (Codex) | Run in a git repository, or add `--skip-git-repo-check` to Codex's `args`. |
 | `orch daemon did not start` | Run `node "$(npm root -g)/claude-codex-orch/dist/daemon/index.js"` in a terminal to see the error, often a typo in `config.yaml`. |
 | `orch usage` shows nothing, or tokens stay 0 | orch fell back to plain text: you overrode `args` without the JSON flag, or the CLI changed its output format. Re-add `--output-format json` (Claude) or `--json` (Codex), or set `output: text` to stop expecting JSON. |
+| A `--context` preset makes the agent fail with an unknown option | The agent CLI does not know a flag in the preset (feature names differ by version). Edit that preset under `contexts` in `~/.orch/config.yaml`, then `orch daemon stop`. |
+| With `context: lean` an agent ignores your global permissions or instructions | By design: `lean` skips user-level settings. Put needed permissions in the agent's `args` (for example `--permission-mode acceptEdits`) or in the project's own settings. |
 | Config edits are ignored | The daemon reads the config once. Run `orch daemon stop`; the next command restarts it. |
 | `cwd must be an existing absolute directory` | The MCP client sent a missing path. Pass an absolute `cwd`. |
 | Long task times out from Codex | Raise `tool_timeout_sec` for the `orch` MCP server in `~/.codex/config.toml`. |

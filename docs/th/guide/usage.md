@@ -5,6 +5,7 @@
 ```bash
 orch run "เพิ่ม endpoint health check"          # รันในโฟลเดอร์ปัจจุบัน
 orch run --cwd ~/code/app "แก้ test ที่พัง"
+orch run --context lean "แก้ typo ใน README"   # ข้าม hooks, plugins และ skills ระดับผู้ใช้
 orch status                                     # cooldown และงานล่าสุด
 orch init                                       # สร้าง ~/.orch/config.yaml ถ้ายังไม่มี
 orch daemon start                               # ไม่จำเป็น เพราะเปิดเองเมื่อต้องใช้
@@ -26,6 +27,7 @@ orch บันทึกทุก attempt ของเอเจนต์ลง `~
 ```bash
 orch usage                         # 24 ชั่วโมงล่าสุด แยกตามเอเจนต์
 orch usage --since 7d --by model   # 7 วันล่าสุด แยกตาม model
+orch usage --by context            # เทียบ context preset
 ```
 
 - ตัวเลขโทเค่นคือ *billable tokens*: input ที่ไม่รวม cache read บวก output (reasoning รวมอยู่ใน output แล้ว) เป็นค่าประมาณไว้ติดตามโควต้า ไม่ใช่การนับของผู้ให้บริการ
@@ -50,7 +52,7 @@ tool_timeout_sec = 1800   # ค่าเริ่มต้นของ Codex ส
 
 Tools:
 
-- `orch_run({ prompt, cwd? })` รันงานและคืนผลของเอเจนต์ ตามด้วยบรรทัด `[orch] status=... agent=... failedOver=...` ค่า `cwd` ต้องเป็นโฟลเดอร์ที่มีอยู่จริง
+- `orch_run({ prompt, cwd?, context? })` รันงานและคืนผลของเอเจนต์ ตามด้วยบรรทัด `[orch] status=... agent=... failedOver=...` ค่า `cwd` ต้องเป็นโฟลเดอร์ที่มีอยู่จริง
 - `orch_status()` คืน cooldown และงานล่าสุดเป็น JSON
 
 การยกเลิกคำสั่งจะหยุดเอเจนต์ที่กำลังรันด้วย

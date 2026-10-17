@@ -60,7 +60,7 @@ async function main(): Promise<number> {
       for (const j of m.jobs.slice(-10)) {
         const when = new Date(j.at).toISOString();
         console.log(
-          `${when} ${j.status} ${j.agent ?? "-"}${j.failedOver ? " (failover)" : ""}${j.model ? ` [${j.model}]` : ""} ${j.promptPreview}`,
+          `${when} ${j.status} ${j.agent ?? "-"}${j.failedOver ? " (failover)" : ""}${j.model ? ` [${j.model}]` : ""}${j.context ? ` <${j.context}>` : ""} ${j.promptPreview}`,
         );
       }
       return 0;
@@ -71,7 +71,7 @@ async function main(): Promise<number> {
       const depth = Number(process.env.ORCH_DEPTH ?? 0) || 0;
       const final = await sendRequest(
         sock,
-        { type: "run", prompt: cmd.prompt, cwd: resolve(cmd.cwd ?? process.cwd()), depth },
+        { type: "run", prompt: cmd.prompt, cwd: resolve(cmd.cwd ?? process.cwd()), depth, context: cmd.context },
         (m) => {
           if (m.type === "chunk") process.stdout.write(m.text);
         },

@@ -25,6 +25,14 @@ describe("buildAgentArgs", () => {
     expect(buildAgentArgs(cfg, { effort: "low" })).toEqual(["-p", "--effort", "low", "{prompt}"]);
   });
 
+  it("inserts context args after model and effort, before --", () => {
+    expect(buildAgentArgs(claude, { model: "haiku", contextArgs: ["--setting-sources", "project"] })).toEqual([
+      "-p", "--output-format", "json", "--model", "haiku", "--setting-sources", "project", "--", "{prompt}",
+    ]);
+    expect(buildAgentArgs(claude, { contextArgs: undefined })).toEqual(claude.args);
+    expect(buildAgentArgs(claude, { contextArgs: [] })).toEqual(claude.args);
+  });
+
   it("ignores a model when the agent has no modelArgs template", () => {
     const cfg = { ...claude, modelArgs: undefined };
     expect(buildAgentArgs(cfg, { model: "x" })).toEqual(claude.args);

@@ -21,6 +21,7 @@ rules:
 
 - `defaultAgent`: `claude` หรือ `codex` ใช้เมื่อไม่มี rule ตรง
 - `agents`: ค่าของแต่ละเอเจนต์ (`claude`, `codex`) ดูด้านล่าง
+- `contexts`: preset ที่รวม flag เพิ่มเติมเพื่อลด context คงที่ของแต่ละการเรียก ดู [Context presets](#context-presets)
 - `rules`: รายการเรียงลำดับ rule แรกที่ `match` ตรงกับ prompt จะถูกใช้
 
 ## key ของเอเจนต์ (`agents.<name>`)
@@ -41,6 +42,7 @@ rules:
 - `agent`: เอเจนต์ที่รับงาน
 - `model`: model ของเอเจนต์นั้นเมื่อ rule ตรง ต้องมี `modelArgs` ของเอเจนต์
 - `effort`: ระดับ effort/reasoning ต้องมี `effortArgs` ของเอเจนต์
+- `context`: ชื่อ preset ใน `contexts` ที่จะใช้ ต่างจาก `model` ตรงที่ใช้ต่อเมื่อสลับไปอีกเอเจนต์ด้วย โดยใช้ flag ของเอเจนต์นั้นเอง
 
 `model` และ `effort` ใช้เฉพาะเมื่อใช้เอเจนต์ของ rule นั้นเอง ถ้าเอเจนต์นั้นพักอยู่หรืองานสลับไปอีกตัว อีกตัวจะรันด้วยค่าของมันเอง
 เพราะชื่อ model ใช้ข้ามค่ายระหว่าง Claude กับ Codex ไม่ได้ ต้องใช้ชื่อ model ที่บัญชีคุณใช้ได้ (ใน Codex ดูด้วย `/model`)
@@ -58,6 +60,36 @@ rules:
     model: opus
     effort: high
 ```
+
+## Context presets
+
+ทุกการเรียก Claude Code หรือ Codex จะโหลด context คงที่ก้อนใหญ่ก่อน ได้แก่ settings ระดับผู้ใช้ hooks plugins และ skills สำหรับงานเล็ก ส่วนนี้คือค่าใช้จ่ายส่วนใหญ่ preset คือชุด flag ที่ข้ามบางส่วนของมัน และปิดไว้จนกว่าจะเลือก จึงไม่เปลี่ยนอะไรโดยค่าเริ่มต้น
+
+```yaml
+contexts:
+  lean:
+    claude: ["--setting-sources", "project", "--disable-slash-commands"]
+    codex: ["--disable", "hooks", "--disable", "plugins", "--disable", "apps"]
+rules:
+  - match: "typo|rename|small fix|explain"
+    agent: claude
+    model: haiku
+    context: lean
+```
+
+preset ในตัว (ดู flag ที่แน่นอนที่ [defaults reference](/reference/config)):
+
+- `lean`: ข้าม settings ระดับผู้ใช้ (plugins, hooks, คำสั่งส่วนตัว) และ skills ของ Claude กับ hooks, plugins, apps ของ Codex แต่ยังคงคำสั่งของโปรเจกต์ (`CLAUDE.md`, `AGENTS.md`) ผลวัด: ต้นทุนงานเล็กบน Claude ลดราว 48% และ input ต่อการเรียกของ Codex ลด 18% ที่ [ผลวัดจริง](/th/guide/benchmarks)
+- `minimal`: Claude ใช้ `--safe-mode` และปิดฟีเจอร์ Codex เพิ่ม ประหยัดมากที่สุด (ลด 68% ในการเรียกคำเดียว) แต่ Claude จะไม่อ่าน `CLAUDE.md` ของโปรเจกต์ด้วย
+
+เลือก preset ด้วย `context:` ใน rule, `orch run --context lean` หรือพารามิเตอร์ `context` ของ MCP tool `orch_run` ลำดับความสำคัญ: สั่งเอง แล้ว rule แล้วไม่ใช้ ชื่อที่ไม่มีอยู่จะถูกปฏิเสธพร้อมรายการชื่อที่ใช้ได้
+
+ข้อควรรู้ก่อนใช้:
+
+- `lean` ข้ามการตั้งค่า **ระดับผู้ใช้** กฎอนุญาต hooks และคำสั่งส่วนตัวของคุณจึงไม่มีผลกับการรันเหล่านั้น ให้ใส่สิทธิ์ที่เอเจนต์ต้องการใน `args` (เช่น `--permission-mode acceptEdits`) หรือในการตั้งค่าของโปรเจกต์เอง
+- preset ของคุณถูกผสานกับของในตัวตามชื่อและตามเอเจนต์ จึงเพิ่ม `mine:` หรือแก้เฉพาะ `lean.codex` ได้
+- ชื่อ flag และ feature เป็นของแต่ละ CLI และเปลี่ยนตามเวอร์ชัน ถ้า CLI ปฏิเสธ flag งานจะล้มและ orch จะสลับเอเจนต์ ให้แก้ preset แล้ว `orch daemon stop`
+- `orch usage --by context` เทียบ preset จากการใช้งานจริงของคุณ
 
 ## ตัวแปรสภาพแวดล้อม
 

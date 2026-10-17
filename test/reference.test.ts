@@ -26,6 +26,12 @@ describe("renderConfigReference", () => {
     for (const rule of DEFAULT_CONFIG.rules) expect(md).toContain(rule.match);
   });
 
+  it("lists the context presets", () => {
+    expect(md).toContain("Context presets");
+    for (const name of Object.keys(DEFAULT_CONFIG.contexts)) expect(md).toContain(name);
+    expect(md).toContain("--setting-sources");
+  });
+
   it("documents the environment variables", () => {
     for (const v of ["ORCH_HOME", "ORCH_CONFIG", "ORCH_DEPTH"]) expect(md).toContain(v);
   });

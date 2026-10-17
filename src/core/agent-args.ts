@@ -3,6 +3,8 @@ import type { AgentConfig } from "./types.js";
 export interface ModelChoice {
   model?: string;
   effort?: string;
+  /** extra flags from a context preset for this agent */
+  contextArgs?: string[];
 }
 
 /**
@@ -18,6 +20,7 @@ export function buildAgentArgs(cfg: AgentConfig, choice: ModelChoice): string[] 
   if (choice.effort && cfg.effortArgs) {
     extra.push(...cfg.effortArgs.map((a) => a.split("{effort}").join(choice.effort!)));
   }
+  if (choice.contextArgs?.length) extra.push(...choice.contextArgs);
   if (extra.length === 0) return cfg.args;
 
   let at = cfg.args.indexOf("--");

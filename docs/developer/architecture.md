@@ -16,8 +16,8 @@ orch is a pure library (`core`) wrapped by a daemon, with two thin clients (CLI 
 |---|---|
 | `src/core/types.ts` | Shared types: `Config`, `RunFn`, `TaskResult`, `Outcome`, ... |
 | `src/core/config.ts` | Defaults, YAML loading and merge, validation, `initConfig`, `orchHome` |
-| `src/core/router.ts` | `pickRoute`: rule match, cooldown skip, model/effort for the rule's agent |
-| `src/core/agent-args.ts` | `buildAgentArgs`: insert model/effort flags before the `--` guard |
+| `src/core/router.ts` | `pickRoute`: rule match, cooldown skip, model/effort for the rule's agent, context name for either agent |
+| `src/core/agent-args.ts` | `buildAgentArgs`: insert model/effort and context-preset flags before the `--` guard |
 | `src/core/runner.ts` | `runCommand`: spawn without a shell, stream stdout, timeout, abort, `ORCH_DEPTH` |
 | `src/core/detector.ts` | `classify`: `ok`, `limited`, `auth` or `failed` from exit code and output |
 | `src/core/output.ts` | `parseAgentOutput`: the answer, error text and token usage from Claude JSON, Codex JSONL or plain text; anything unexpected falls back to the raw text |
@@ -33,7 +33,7 @@ orch is a pure library (`core`) wrapped by a daemon, with two thin clients (CLI 
 ## Data flow of `runTask`
 
 1. Reject when `depth >= 1` (an orch-started agent called orch).
-2. `pickRoute` chooses an agent that is not cooling down, plus the matching rule's model/effort. All agents cooling returns status `unavailable`.
+2. `pickRoute` chooses an agent that is not cooling down, plus the matching rule's model/effort/context. An explicit `context` on the request wins over the rule's; an unknown name is rejected before anything runs. The preset's flags for the chosen agent are added to its argv, and a failover uses the same preset name with the other agent's flags. All agents cooling returns status `unavailable`.
 3. `runAttempt` builds argv with `buildAgentArgs`, runs it, **parses the output** into answer, error text and usage, then **scrubs the prompt out of that text** (CLIs echo it, and the handoff text itself contains "rate limit") before classifying. Every attempt is appended to the usage ledger. JSON agents are not streamed: their raw stdout is machine output, so the CLI prints the final answer once.
 4. `limited` sets a cooldown: the parsed reset time, else `defaultCooldownSec`.
 5. On anything but `ok`: if the caller aborted, stop. If the other agent is cooling, return `failed`. Otherwise build the handoff (asking the first agent for a summary only after a plain `failed`) and run the other agent once, without the rule's model.

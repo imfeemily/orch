@@ -1,10 +1,10 @@
 import { parseDuration } from "../core/usage.js";
 
 export type Command =
-  | { name: "run"; prompt: string; cwd?: string }
+  | { name: "run"; prompt: string; cwd?: string; context?: string }
   | { name: "status" }
   | { name: "init" }
-  | { name: "usage"; since: string; by: "agent" | "model" }
+  | { name: "usage"; since: string; by: "agent" | "model" | "context" }
   | { name: "daemon"; action: "start" | "stop" }
   | { name: "help" };
 
@@ -12,6 +12,7 @@ export function parseArgs(argv: string[]): Command {
   const [cmd, ...rest] = argv;
   if (cmd === "run") {
     let cwd: string | undefined;
+    let context: string | undefined;
     const words: string[] = [];
     for (let i = 0; i < rest.length; i++) {
       if (rest[i] === "--cwd") {
@@ -19,15 +20,20 @@ export function parseArgs(argv: string[]): Command {
         if (!cwd) throw new Error("--cwd requires a directory");
         continue;
       }
+      if (rest[i] === "--context") {
+        context = rest[++i];
+        if (!context) throw new Error("--context requires a preset name");
+        continue;
+      }
       words.push(rest[i]);
     }
     const prompt = words.join(" ").trim();
     if (!prompt) throw new Error("usage: orch run [--cwd DIR] <prompt>");
-    return { name: "run", prompt, cwd };
+    return { name: "run", prompt, cwd, context };
   }
   if (cmd === "usage") {
     let since = "24h";
-    let by: "agent" | "model" = "agent";
+    let by: "agent" | "model" | "context" = "agent";
     for (let i = 0; i < rest.length; i++) {
       if (rest[i] === "--since") {
         since = rest[++i] ?? "";
@@ -36,7 +42,7 @@ export function parseArgs(argv: string[]): Command {
         }
       } else if (rest[i] === "--by") {
         const v = rest[++i];
-        if (v !== "agent" && v !== "model") throw new Error("--by must be agent or model");
+        if (v !== "agent" && v !== "model" && v !== "context") throw new Error("--by must be agent, model or context");
         by = v;
       } else {
         throw new Error(`unknown option: ${rest[i]}`);

@@ -59,6 +59,7 @@ export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promi
           prompt: req.prompt,
           cwd: req.cwd,
           depth: Number(req.depth) || 0,
+          context: typeof req.context === "string" ? req.context : undefined,
           signal,
           onChunk: (text) => send({ type: "chunk", text }),
         });

@@ -96,6 +96,33 @@ describe("loadConfig", () => {
     ).toThrow(/modelArgs/);
   });
 
+  it("ships lean and minimal context presets for both agents", () => {
+    for (const name of ["lean", "minimal"]) {
+      expect(DEFAULT_CONFIG.contexts[name].claude!.length).toBeGreaterThan(0);
+      expect(DEFAULT_CONFIG.contexts[name].codex!.length).toBeGreaterThan(0);
+    }
+    expect(DEFAULT_CONFIG.contexts.lean.claude).toContain("--setting-sources");
+    expect(DEFAULT_CONFIG.contexts.minimal.claude).toContain("--safe-mode");
+  });
+
+  it("merges user context presets over the defaults by name", () => {
+    const cfg = loadConfig(
+      tmpFile('contexts:\n  mine:\n    claude: ["--disable-slash-commands"]\n  lean:\n    codex: ["--disable", "hooks"]\n'),
+    );
+    expect(cfg.contexts.mine.claude).toEqual(["--disable-slash-commands"]);
+    expect(cfg.contexts.lean.codex).toEqual(["--disable", "hooks"]);
+    expect(cfg.contexts.minimal).toEqual(DEFAULT_CONFIG.contexts.minimal);
+  });
+
+  it("rejects a rule that names an unknown context", () => {
+    expect(() => loadConfig(tmpFile('rules:\n  - match: x\n    agent: claude\n    context: nope\n'))).toThrow(/context.*nope/);
+  });
+
+  it("rejects malformed context presets", () => {
+    expect(() => loadConfig(tmpFile('contexts:\n  bad:\n    gemini: ["--x"]\n'))).toThrow(/contexts\.bad/);
+    expect(() => loadConfig(tmpFile('contexts:\n  bad:\n    claude: "--x"\n'))).toThrow(/contexts\.bad/);
+  });
+
   it("rejects an invalid auth pattern", () => {
     expect(() =>
       loadConfig(tmpFile('agents:\n  claude:\n    authPatterns: ["("]\n')),

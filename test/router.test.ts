@@ -29,6 +29,21 @@ describe("pickAgent", () => {
   });
 });
 
+const withContext: Config = {
+  ...DEFAULT_CONFIG,
+  rules: [{ match: "typo", agent: "codex", model: "gpt-6-luna", context: "lean" }],
+};
+
+describe("pickRoute context", () => {
+  it("carries the rule's context", () => {
+    expect(pickRoute(withContext, "fix typo", none)).toEqual({ agent: "codex", model: "gpt-6-luna", context: "lean" });
+  });
+
+  it("keeps the context name (but drops the model) when the other agent is used", () => {
+    expect(pickRoute(withContext, "fix typo", (a) => a === "codex")).toEqual({ agent: "claude", context: "lean" });
+  });
+});
+
 describe("pickRoute", () => {
   it("carries the rule's model and effort to its agent", () => {
     expect(pickRoute(withModels, "fix typo", none)).toEqual({ agent: "codex", model: "gpt-6-luna", effort: "low" });

@@ -38,7 +38,7 @@ Run everything with `npm test` (Vitest). Automated tests **never call the real `
 
 ## Benchmarks
 
-`npm run benchmark` (script: `scripts/benchmark.ts`) runs the **real** `claude` and `codex` in temporary repositories and records tokens, cost and correctness per run in `benchmarks/`. It spends real tokens (a few dollars), so it is not part of `npm test`. Results and method are published on the Benchmarks page of the guide; rerun it and update that page when routing, handoff or output parsing changes.
+`npm run benchmark` (script: `scripts/benchmark.ts`) runs the **real** `claude` and `codex` (experiments A to E) in temporary repositories and records tokens, cost and correctness per run in `benchmarks/`. It spends real tokens (a few dollars), so it is not part of `npm test`. Results and method are published on the Benchmarks page of the guide; rerun it and update that page when routing, handoff or output parsing changes.
 
 ## Manual smoke test (before a release)
 

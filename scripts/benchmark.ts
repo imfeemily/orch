@@ -5,6 +5,7 @@
  *   npm run build && npm run benchmark -- [--only A,B,C,D] [--out benchmarks/results-DATE.json]
  *
  * A: model routing   B: orch overhead   C: handoff cost   D: fixed context per call
+ * E: context presets (`--context lean`) against the default context
  * Everything runs in temporary copies of a small seeded repository.
  */
 import { spawnSync } from "node:child_process";
@@ -21,7 +22,7 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const CLI = join(ROOT, "dist/cli/index.js");
 const args = process.argv.slice(2);
 const flag = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
-const only = new Set((flag("--only") ?? "A,B,C,D").split(","));
+const only = new Set((flag("--only") ?? "A,B,C,D,E").split(","));
 const date = new Date().toISOString().slice(0, 10);
 const C_REPEATS = Number(flag("--c-repeats") ?? 1);
 const SKIP_SUMMARY = args.includes("--skip-summary");
@@ -29,7 +30,7 @@ const OUT = resolve(flag("--out") ?? join(ROOT, `benchmarks/results-${date}.json
 
 interface RunRecord {
   id: string;
-  experiment: "A" | "B" | "C" | "D";
+  experiment: "A" | "B" | "C" | "D" | "E";
   task: string;
   variant: string;
   agent: "claude" | "codex";
@@ -129,12 +130,12 @@ function codexDirect(cwd: string, prompt: string): Measured {
 }
 
 /** Runs the task through the built `orch` CLI with its own throwaway ORCH_HOME and reads the ledger. */
-function viaOrch(cwd: string, prompt: string, configYaml: string): Measured {
+function viaOrch(cwd: string, prompt: string, configYaml: string, extraCli: string[] = []): Measured {
   const home = mkdtempSync(join(WORK, "home-"));
   writeFileSync(join(home, "config.yaml"), configYaml);
   const env = { ...process.env, ORCH_HOME: home };
   const t0 = Date.now();
-  const r = spawnSync(process.execPath, [CLI, "run", "--cwd", cwd, prompt], { env, encoding: "utf8", timeout: 600_000 });
+  const r = spawnSync(process.execPath, [CLI, "run", "--cwd", cwd, ...extraCli, prompt], { env, encoding: "utf8", timeout: 600_000 });
   const durationMs = Date.now() - t0;
   spawnSync(process.execPath, [CLI, "daemon", "stop"], { env });
   const ledgerPath = join(home, "usage.jsonl");
@@ -302,11 +303,43 @@ function expD() {
   record("D-codex-default", "D", "one-word answer", "codex, default context", "codex", m, /pong/i.test(m.text));
 }
 
+const ORCH_CODEX = `defaultAgent: codex
+rules:
+  - match: ".*"
+    agent: codex
+    model: gpt-6-luna
+    effort: low
+`;
+const PONG = "reply with exactly the word pong and nothing else";
+
+/** Same tasks, default model, default context against `--context lean`; order alternates so cache warmth does not favour one. */
+function expE() {
+  // warm each variant's prompt cache first (different flags mean different cached prefixes)
+  viaOrch(freshRepo("E-warm-default"), PONG, ORCH_DEFAULT);
+  viaOrch(freshRepo("E-warm-lean"), PONG, ORCH_DEFAULT, ["--context", "lean"]);
+  let i = 0;
+  for (const [key, t] of Object.entries(TASKS)) {
+    const order = i++ % 2 === 0 ? ["default", "lean"] : ["lean", "default"];
+    for (const variant of order) {
+      const dir = freshRepo(`E-${key}-${variant}`);
+      const o = viaOrch(dir, t.prompt, ORCH_DEFAULT, variant === "lean" ? ["--context", "lean"] : []);
+      record(`E-${key}-${variant}`, "E", t.name, variant === "lean" ? "orch --context lean" : "orch, default context", "claude", o, t.check(dir, o.text));
+    }
+  }
+  for (let r = 1; r <= 2; r++) {
+    for (const variant of r === 1 ? ["default", "lean"] : ["lean", "default"]) {
+      const dir = freshRepo(`E-codex-${variant}-${r}`);
+      const o = viaOrch(dir, PONG, ORCH_CODEX, variant === "lean" ? ["--context", "lean"] : []);
+      record(`E-codex-${variant}-${r}`, "E", "one-word answer", variant === "lean" ? "orch --context lean" : "orch, default context", "codex", o, /pong/i.test(o.text));
+    }
+  }
+}
+
 async function main() {
   if (!existsSync(CLI)) throw new Error("dist/ is missing: run `npm run build` first");
   console.log(`Benchmark: spends real tokens. Experiments: ${[...only].join(", ")}. Output: ${OUT}`);
   seedRepo();
-  const steps: Array<[string, () => void | Promise<void>]> = [["A", expA], ["B", expB], ["C", expC], ["D", expD]];
+  const steps: Array<[string, () => void | Promise<void>]> = [["A", expA], ["B", expB], ["C", expC], ["D", expD], ["E", expE]];
   for (const [name, fn] of steps) {
     if (!only.has(name)) continue;
     console.log(`\n== Experiment ${name}`);

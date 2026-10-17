@@ -31,6 +31,17 @@ describe("parseArgs", () => {
     expect(parseArgs(["daemon", "stop"])).toEqual({ name: "daemon", action: "stop" });
   });
 
+  it("parses --context for run", () => {
+    expect(parseArgs(["run", "--context", "lean", "fix", "it"])).toEqual({
+      name: "run", prompt: "fix it", cwd: undefined, context: "lean",
+    });
+    expect(() => parseArgs(["run", "x", "--context"])).toThrow(/--context/);
+  });
+
+  it("accepts --by context for usage", () => {
+    expect(parseArgs(["usage", "--by", "context"])).toEqual({ name: "usage", since: "24h", by: "context" });
+  });
+
   it("parses usage with defaults and options", () => {
     expect(parseArgs(["usage"])).toEqual({ name: "usage", since: "24h", by: "agent" });
     expect(parseArgs(["usage", "--since", "7d", "--by", "model"])).toEqual({ name: "usage", since: "7d", by: "model" });

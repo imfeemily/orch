@@ -1,7 +1,7 @@
 import type { AgentName, JobEntry, TaskResult } from "../core/types.js";
 
 export type Request =
-  | { type: "run"; prompt: string; cwd: string; depth: number }
+  | { type: "run"; prompt: string; cwd: string; depth: number; context?: string }
   | { type: "status" }
   | { type: "shutdown" };
 

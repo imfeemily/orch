@@ -1,6 +1,6 @@
 # Benchmarks: where orch saves tokens
 
-These are real runs of the real `claude` and `codex` on one machine, measured on 2026-10-17. They show **which orch features reduce cost, by how much, and which do not**. Raw data is in `benchmarks/results-2026-10-17.json` and `benchmarks/results-2026-10-17-handoff-repeat.json`; the harness is `scripts/benchmark.ts`.
+These are real runs of the real `claude` and `codex` on one machine, measured on 2026-10-17. They show **which orch features reduce cost, by how much, and which do not**. Raw data is in `benchmarks/results-2026-10-17.json` and `benchmarks/results-2026-10-17-handoff-repeat.json` and `benchmarks/results-2026-10-17-context.json`; the harness is `scripts/benchmark.ts`.
 
 ::: warning Read the limits first
 Few runs, one machine, one small repository, three small tasks. Treat the numbers as a direction, not statistics. Identical runs differ a lot (see [Noise](#noise-the-same-task-varied-by-38)), so only differences much bigger than about 40% mean something.
@@ -14,7 +14,8 @@ Few runs, one machine, one small repository, three small tasks. Treat the number
 | **Slimmer handoff**: `git diff --stat` instead of an inlined diff (large diffs only) | **about -5,700 to -7,300 input tokens per model call** of the receiving agent (-20% to -25% per call) on a 60,000-character diff | Medium: clean in single-call runs, hidden by noise in whole-run totals |
 | **Skipping the summary call** after a limit or login failure | Saves time, **not tokens** (a call to a limited agent should fail immediately; not measured) | Reasoning only |
 | orch itself | **No measurable overhead** (+0.7% tokens, +5.8% cost, within noise); orch makes no LLM calls of its own | Good |
-| **Fixed context per call** (skills, plugins, hooks, MCP) | **Not reduced by orch.** 44% to 86% of the cost of a small task. A lean mode would cut a one-word call by 68%, with trade-offs | Good (the next opportunity) |
+| **Context presets** (`--context lean`): skip user-level hooks, plugins and skills | **-48% cost** across the same 3 tasks with the default model (-41% against every default run in this study), all correct; Codex **-18% input per call** | Medium: consistent direction, but one run per task and about ±30% noise |
+| **Fixed context per call** if you do nothing | Not reduced by default: 44% to 86% of the cost of a small task. `--safe-mode` (preset `minimal`) cuts a one-word call by 68% but also drops project instructions | Good |
 
 The key point: **orch saves money mainly by choosing a cheaper model for small tasks, not by sending fewer tokens.** Token counts barely moved (-27%), cost fell by three quarters because a token on `haiku` is much cheaper than a token on `sonnet`.
 
@@ -97,19 +98,38 @@ A one-word answer ("reply with the word pong") shows what each call costs before
 
 On this machine a one-word answer costs $0.13 on Claude (an earlier cold-cache measurement was $0.27). That is **44% of the typo task's repeat cost and 86% of the explain task's cost**: for small tasks, most of the bill is the context loaded on every call, which orch does not reduce. `--safe-mode` shows the size of the opportunity, but it also removes your project instructions and tools, so it changes behaviour and is not a free win.
 
+## Experiment E: context presets
+
+The same three tasks with the default model, through orch, with the default context and with `--context lean` (see [Context presets](/guide/configuration#context-presets)). The order alternated between tasks and each variant's cache was warmed first.
+
+| Task | Default context | `--context lean` | Cost change | Total input change | Correct |
+|---|---|---|---|---|---|
+| Fix a typo | 66,883 tokens, $0.4418 | 41,700 tokens, $0.2803 | **-37%** | -28% | yes / yes |
+| Write a small test | 43,107 tokens, $0.3154 | 17,552 tokens, $0.1369 | **-57%** | -46% | yes / yes |
+| Explain a function | 40,667 tokens, $0.2621 | 16,246 tokens, $0.1140 | **-56%** | -28% | yes / yes |
+| **All three** | **150,657 tokens, $1.0193** | **75,498 tokens, $0.5312** | **-48%** | **-34%** | 3/3 / 3/3 |
+
+"Total input" counts cache reads too (it is what the model actually received).
+
+**Reading it honestly.** The direction is the same in all three tasks, but each cell is one run and the default-context cost itself varies about ±30% from run to run: the typo task cost $0.4242, $0.2952 and $0.4418 in three default runs. Against every default run of these tasks in this study the saving is **-41%**, and per task it ranges from -5% to -57% depending on which baseline you pick. The one-word probes agree: `--setting-sources project` alone cut cost by 47% and `lean`-style combinations by 58%. So expect roughly **40% to 50%**, not an exact number.
+
+**Codex** (one-word answer through orch, `gpt-6-luna`, low effort): total input per call went from 22,066 and 21,280 (default) to 17,862 and 17,862 (`lean`), about **-18%**. Codex's own base context is smaller and less compressible than Claude's.
+
+What `lean` gives up: user-level settings, hooks, plugins and personal instructions. These tasks did not depend on any of them. Check your own: if a task needs a user-level permission or hook, put it in the agent's `args` or the project's settings.
+
 ## What to do with this
 
 1. **Add model rules for small tasks.** This is the saving that measured clearly. Start with typo, rename, explain and small-test rules (see [Configuration](/guide/configuration)), check `orch usage --by model`, and widen only if results stay correct.
 2. **Leave the handoff defaults.** They help most when a failover happens with a large uncommitted change.
 3. **Consider removing `summaryArgs`** if failovers after plain failures are frequent and cost matters more than the extra context.
-4. **Look at your fixed context.** Heavy skills, plugins and MCP servers make every call expensive, including every call orch makes for you. Trimming them saves more than any routing rule on small tasks.
+4. **Use a context preset for small tasks.** Add `context: lean` to your small-task rules next to the model rule (Experiment E). Heavy user-level hooks, plugins and skills are loaded into every call orch makes for you; `lean` skips them while keeping the project's own instructions.
 5. **Do not trust single runs.** Use `orch usage` over days, not one comparison.
 
 ## Limits of this study
 
 - Few runs and one machine: results vary with account, plan, cache state and CLI version.
 - Savings from model routing depend on your default model. If your default is already `haiku`, routing saves nothing.
-- Three small tasks. Quality on harder tasks was not tested, and a cheaper model that needs a retry costs more.
+- Three small tasks. Quality on harder tasks was not tested, and a cheaper model that needs a retry costs more. The same applies to `lean`: a task that needs your user-level hooks or skills will behave differently.
 - Codex cost in dollars is not reported by the CLI, so Experiment C uses tokens only.
 - Not measured: the value of avoiding a mid-task rate limit, which needs the quota-aware routing planned for a later stage.
 
@@ -119,6 +139,7 @@ On this machine a one-word answer costs $0.13 on Claude (an earlier cold-cache m
 npm run build
 npm run benchmark                                  # all experiments, real tokens, a few dollars
 npm run benchmark -- --only A,B                    # a subset
+npm run benchmark -- --only E                      # context presets
 npm run benchmark -- --only C --c-repeats 4 --skip-summary --out benchmarks/my-run.json
 ```
 

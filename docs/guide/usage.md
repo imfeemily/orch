@@ -5,6 +5,7 @@
 ```bash
 orch run "add a health check endpoint"          # runs in the current directory
 orch run --cwd ~/code/app "fix the failing test"
+orch run --context lean "fix the typo in README"   # skip user-level hooks, plugins and skills
 orch status                                     # cooldowns and recent jobs
 orch init                                       # create ~/.orch/config.yaml if missing
 orch daemon start                               # optional: it starts on demand
@@ -25,6 +26,7 @@ orch records every agent attempt in `~/.orch/usage.jsonl` (kept for 90 days) and
 ```bash
 orch usage                         # last 24 hours, per agent
 orch usage --since 7d --by model   # last 7 days, per model
+orch usage --by context            # compare context presets
 ```
 
 - The token figure is *billable tokens*: input excluding cache reads, plus output (reasoning is already inside output). It is an approximation for tracking quota, not the vendor's own accounting.
@@ -49,7 +51,7 @@ tool_timeout_sec = 1800   # Codex's default tool timeout is short; real tasks ta
 
 Tools:
 
-- `orch_run({ prompt, cwd? })` runs a task and returns the agent's output followed by a `[orch] status=... agent=... failedOver=...` line. `cwd` defaults to the server's directory and must be an existing directory.
+- `orch_run({ prompt, cwd?, context? })` runs a task and returns the agent's output followed by a `[orch] status=... agent=... failedOver=...` line. `cwd` defaults to the server's directory and must be an existing directory.
 - `orch_status()` returns cooldowns and recent jobs as JSON.
 
 Cancelling a call stops the running agent.

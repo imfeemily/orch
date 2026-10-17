@@ -8,6 +8,7 @@ export interface Route {
   agent: AgentName;
   model?: string;
   effort?: string;
+  context?: string;
 }
 
 function matchRule(config: Config, prompt: string): RouteRule | undefined {
@@ -15,9 +16,9 @@ function matchRule(config: Config, prompt: string): RouteRule | undefined {
 }
 
 /**
- * Chooses the agent and, when a rule matched, its model/effort. If the rule's
- * agent is cooling, the other agent is used with its own defaults: model names
- * are not portable between Claude and Codex.
+ * Chooses the agent and, when a rule matched, its model/effort/context. If the
+ * rule's agent is cooling, the other agent is used with its own defaults: model
+ * names are not portable between Claude and Codex, but a context name is.
  */
 export function pickRoute(
   config: Config,
@@ -30,10 +31,13 @@ export function pickRoute(
     const route: Route = { agent: preferred };
     if (rule?.model) route.model = rule.model;
     if (rule?.effort) route.effort = rule.effort;
+    if (rule?.context) route.context = rule.context;
     return route;
   }
   const alt = otherAgent(preferred);
-  return isCooling(alt) ? null : { agent: alt };
+  if (isCooling(alt)) return null;
+  // A context preset maps to each agent's own flags, so its name survives the switch.
+  return rule?.context ? { agent: alt, context: rule.context } : { agent: alt };
 }
 
 export function pickAgent(

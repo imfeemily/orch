@@ -4,6 +4,9 @@ All notable changes are listed here. Add user-visible changes under **Unreleased
 
 ## Unreleased
 
+- Context presets: `contexts` in the config (built-in `lean` and `minimal`) and `context:` on rules, `orch run --context NAME`, and a `context` parameter on MCP `orch_run` add flags that skip user-level settings, hooks, plugins and skills to shrink the fixed context of each call. Off unless selected; a failover keeps the preset name with the other agent's flags. `orch usage --by context` compares presets; `orch status` shows the preset used.
+- Benchmarks: experiment E measures presets against the default context (about -48% cost on small Claude tasks, -18% input per Codex call).
+
 - Benchmarks page (English and Thai) with real measurements of where orch saves tokens and cost, plus a reproducible harness (`npm run benchmark`, `scripts/benchmark.ts`) and the raw results in `benchmarks/`.
 
 - Usage ledger: every attempt is recorded in `~/.orch/usage.jsonl` with token counts (and cost for Claude). New `orch usage [--since 24h|7d] [--by agent|model]`, token totals in `orch status`, and `tokens=<n>` in the MCP `orch_run` result.

@@ -20,6 +20,7 @@ rules:
 
 - `defaultAgent`: `claude` or `codex`. Used when no rule matches.
 - `agents`: settings per agent (`claude`, `codex`); see below.
+- `contexts`: named presets of extra flags that shrink the fixed context of each call; see [Context presets](#context-presets).
 - `rules`: ordered list; the first rule whose `match` fits the prompt wins.
 
 ## Agent keys (`agents.<name>`)
@@ -40,6 +41,7 @@ rules:
 - `agent`: which agent handles it.
 - `model`: model for that agent when the rule matches. Requires the agent's `modelArgs`.
 - `effort`: effort or reasoning level. Requires the agent's `effortArgs`.
+- `context`: name of a `contexts` preset to apply. Unlike `model`, it also applies when the task falls over to the other agent, using that agent's own flags.
 
 `model` and `effort` apply only when the rule's own agent is used. If that agent is cooling down, or the task fails over, the other agent runs with its own defaults because model names are not portable between Claude and Codex. Use a model your account offers (in Codex, `/model` lists them).
 
@@ -56,6 +58,36 @@ rules:
     model: opus
     effort: high
 ```
+
+## Context presets
+
+Every call to Claude Code or Codex first loads a large fixed context: your user-level settings, hooks, plugins and skills. For a small task this is most of the bill. A context preset adds flags that skip part of it. Presets are off unless you pick one, so nothing changes by default.
+
+```yaml
+contexts:
+  lean:
+    claude: ["--setting-sources", "project", "--disable-slash-commands"]
+    codex: ["--disable", "hooks", "--disable", "plugins", "--disable", "apps"]
+rules:
+  - match: "typo|rename|small fix|explain"
+    agent: claude
+    model: haiku
+    context: lean
+```
+
+Built-in presets (see the [defaults reference](/reference/config) for the exact flags):
+
+- `lean`: skips user-level settings (plugins, hooks, personal instructions) and skills for Claude, and hooks, plugins and apps for Codex. Project instructions (`CLAUDE.md`, `AGENTS.md`) are kept. About -48% cost on small Claude tasks and -18% input per Codex call in the [benchmarks](/guide/benchmarks).
+- `minimal`: Claude `--safe-mode` and more Codex features off. The biggest saving (-68% on a one-word call), but Claude also ignores the project's `CLAUDE.md`.
+
+Choose a preset with `context:` in a rule, `orch run --context lean`, or the `context` parameter of the MCP `orch_run` tool. Precedence: explicit choice, then rule, then none. An unknown name is rejected with the list of valid names.
+
+Things to know before using one:
+
+- `lean` skips **user-level** settings, so your personal allow rules, hooks and instructions do not apply to those runs. Put the permissions an agent needs in its `args` (for example `--permission-mode acceptEdits`) or in the project's own settings.
+- Your own presets are merged with the built-in ones by name and by agent, so you can add `mine:` or change just `lean.codex`.
+- Flag and feature names belong to each CLI and change between versions. If a CLI rejects a flag, the run fails and orch fails over; fix the preset and run `orch daemon stop`.
+- `orch usage --by context` compares presets from your own usage.
 
 ## Environment variables
 

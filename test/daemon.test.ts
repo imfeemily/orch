@@ -43,6 +43,20 @@ describe("daemon", () => {
     if (final.type === "result") expect(final.result.status).toBe("ok");
   });
 
+  it("forwards context to the run and reports an unknown context as rejected", async () => {
+    const seen: string[][] = [];
+    const run: RunFn = async (_c, args) => {
+      seen.push(args);
+      return { exitCode: 0, stdout: "ok", stderr: "" };
+    };
+    const s = setup(run);
+    closers.push((await startDaemon({ sockPath: s.sockPath, deps: s.deps })).close);
+    await sendRequest(s.sockPath, { type: "run", prompt: "x", cwd: s.dir, depth: 0, context: "lean" }, () => {});
+    expect(seen[0]).toContain("--setting-sources");
+    const bad = await sendRequest(s.sockPath, { type: "run", prompt: "x", cwd: s.dir, depth: 0, context: "nope" }, () => {});
+    expect(bad.type === "result" && bad.result.status).toBe("rejected");
+  });
+
   it("answers status", async () => {
     const s = setup(okRun);
     closers.push((await startDaemon({ sockPath: s.sockPath, deps: s.deps })).close);

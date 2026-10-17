@@ -20,10 +20,14 @@ describe("docs stay in sync with the code", () => {
   it("documents every config key in guide/configuration.md", () => {
     const keys = [
       ...Object.keys(DEFAULT_CONFIG.agents.claude),
-      "defaultAgent", "agents", "rules", "match", "agent", "model", "effort",
+      "defaultAgent", "agents", "rules", "match", "agent", "model", "effort", "contexts", "context",
     ];
     const page = read("guide/configuration.md");
     for (const k of keys) expect(page, `\`${k}\` is not in guide/configuration.md`).toContain(`\`${k}\``);
+  });
+
+  it("documents the --context flag in guide/usage.md", () => {
+    expect(read("guide/usage.md")).toContain("--context");
   });
 
   it("documents every environment variable in guide/configuration.md", () => {

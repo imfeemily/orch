@@ -112,6 +112,7 @@ rules:
   The flags come from each agent's `modelArgs` / `effortArgs` templates
   (defaults: Claude `--model` / `--effort`, Codex `-m` / `-c model_reasoning_effort=`).
   `orch status` shows the model used for each job.
+- **Shrink the fixed context** of small tasks with a preset: add `context: lean` to a rule, or run `orch run --context lean "..."`. Presets skip user-level hooks, plugins and skills (about -48% cost on small Claude tasks in the benchmarks) and are off unless selected. See the Configuration page.
 - `limitPatterns` and `authPatterns` (regexes matched against stderr and the last
   20 lines of stdout) can be overridden per agent if a real error is not detected.
 - Remove `summaryArgs` to disable the handoff summary.

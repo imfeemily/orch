@@ -1,0 +1,221 @@
+{
+  "meta": {
+    "date": "2026-10-17",
+    "node": "v24.16.0",
+    "claude": "2.1.231 (Claude Code)",
+    "codex": "codex-cli 0.162.1",
+    "platform": "darwin"
+  },
+  "records": [
+    {
+      "id": "E-T1-default",
+      "experiment": "E",
+      "task": "fix a typo",
+      "variant": "orch, default context",
+      "agent": "claude",
+      "models": [
+        "(default)"
+      ],
+      "usage": {
+        "inputTokens": 66330,
+        "cacheReadTokens": 118361,
+        "outputTokens": 553,
+        "costUsd": 0.4417593
+      },
+      "billableTokens": 66883,
+      "costUsd": 0.4417593,
+      "durationMs": 15651,
+      "success": true,
+      "answerPreview": "Fixed: \"recieve\" → \"receive\" on line 3 of README.md.\n"
+    },
+    {
+      "id": "E-T1-lean",
+      "experiment": "E",
+      "task": "fix a typo",
+      "variant": "orch --context lean",
+      "agent": "claude",
+      "models": [
+        "(default)"
+      ],
+      "usage": {
+        "inputTokens": 41422,
+        "cacheReadTokens": 92166,
+        "outputTokens": 278,
+        "costUsd": 0.28032779999999996
+      },
+      "billableTokens": 41700,
+      "costUsd": 0.28032779999999996,
+      "durationMs": 10862,
+      "success": true,
+      "answerPreview": "Fixed: \"recieve\" → \"receive\" in README.md.\n"
+    },
+    {
+      "id": "E-T2-lean",
+      "experiment": "E",
+      "task": "write a small test",
+      "variant": "orch --context lean",
+      "agent": "claude",
+      "models": [
+        "(default)"
+      ],
+      "usage": {
+        "inputTokens": 16821,
+        "cacheReadTokens": 83523,
+        "outputTokens": 731,
+        "costUsd": 0.13692990000000002
+      },
+      "billableTokens": 17552,
+      "costUsd": 0.13692990000000002,
+      "durationMs": 14104,
+      "success": true,
+      "answerPreview": "Created `test/math.test.ts` with vitest tests covering `add()` and `clamp()` (including boundary cases). Nothing was run or installed.\n"
+    },
+    {
+      "id": "E-T2-default",
+      "experiment": "E",
+      "task": "write a small test",
+      "variant": "orch, default context",
+      "agent": "claude",
+      "models": [
+        "(default)"
+      ],
+      "usage": {
+        "inputTokens": 41634,
+        "cacheReadTokens": 145135,
+        "outputTokens": 1473,
+        "costUsd": 0.3154155
+      },
+      "billableTokens": 43107,
+      "costUsd": 0.3154155,
+      "durationMs": 35715,
+      "success": true,
+      "answerPreview": "Created `test/math.test.ts` with 7 cases covering `add()` and `clamp()` (normal, negative, zero, boundary values). Not run, nothing installed, as requested.\n"
+    },
+    {
+      "id": "E-T3-default",
+      "experiment": "E",
+      "task": "explain code",
+      "variant": "orch, default context",
+      "agent": "claude",
+      "models": [
+        "(default)"
+      ],
+      "usage": {
+        "inputTokens": 40342,
+        "cacheReadTokens": 50585,
+        "outputTokens": 325,
+        "costUsd": 0.2620905
+      },
+      "billableTokens": 40667,
+      "costUsd": 0.2620905,
+      "durationMs": 11309,
+      "success": true,
+      "answerPreview": "`clamp(value, min, max)` constrains `value` to the range `[min, max]`. It returns `min` whenever `value < min` (checked first), `max` when `value > max`, and ot"
+    },
+    {
+      "id": "E-T3-lean",
+      "experiment": "E",
+      "task": "explain code",
+      "variant": "orch --context lean",
+      "agent": "claude",
+      "models": [
+        "(default)"
+      ],
+      "usage": {
+        "inputTokens": 16064,
+        "cacheReadTokens": 49551,
+        "outputTokens": 182,
+        "costUsd": 0.1139673
+      },
+      "billableTokens": 16246,
+      "costUsd": 0.1139673,
+      "durationMs": 8357,
+      "success": true,
+      "answerPreview": "`clamp(value, min, max)` constrains `value` to the `[min, max]` range: if `value` is less than `min` it returns `min`, if it's greater than `max` it returns `ma"
+    },
+    {
+      "id": "E-codex-default-1",
+      "experiment": "E",
+      "task": "one-word answer",
+      "variant": "orch, default context",
+      "agent": "codex",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "inputTokens": 9522,
+        "cacheReadTokens": 12544,
+        "outputTokens": 5,
+        "costUsd": 0
+      },
+      "billableTokens": 9527,
+      "costUsd": 0,
+      "durationMs": 7908,
+      "success": true,
+      "answerPreview": "pong\n"
+    },
+    {
+      "id": "E-codex-lean-1",
+      "experiment": "E",
+      "task": "one-word answer",
+      "variant": "orch --context lean",
+      "agent": "codex",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "inputTokens": 6470,
+        "cacheReadTokens": 11392,
+        "outputTokens": 5,
+        "costUsd": 0
+      },
+      "billableTokens": 6475,
+      "costUsd": 0,
+      "durationMs": 4324,
+      "success": true,
+      "answerPreview": "pong\n"
+    },
+    {
+      "id": "E-codex-lean-2",
+      "experiment": "E",
+      "task": "one-word answer",
+      "variant": "orch --context lean",
+      "agent": "codex",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "inputTokens": 6470,
+        "cacheReadTokens": 11392,
+        "outputTokens": 5,
+        "costUsd": 0
+      },
+      "billableTokens": 6475,
+      "costUsd": 0,
+      "durationMs": 3786,
+      "success": true,
+      "answerPreview": "pong\n"
+    },
+    {
+      "id": "E-codex-default-2",
+      "experiment": "E",
+      "task": "one-word answer",
+      "variant": "orch, default context",
+      "agent": "codex",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "inputTokens": 14112,
+        "cacheReadTokens": 7168,
+        "outputTokens": 5,
+        "costUsd": 0
+      },
+      "billableTokens": 14117,
+      "costUsd": 0,
+      "durationMs": 4580,
+      "success": true,
+      "answerPreview": "pong\n"
+    }
+  ]
+}

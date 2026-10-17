@@ -18,6 +18,8 @@ export function renderConfigReference(cfg: Config): string {
     `Default agent: \`${cfg.defaultAgent}\``,
     "# Agents",
     ...sections,
+    "# Context presets\n\nExtra flags per agent that shrink the fixed context of every call. Select one with `context:` in a rule, `orch run --context NAME`, or the MCP `context` parameter. Presets are off unless selected.",
+    fence("yaml", stringify({ contexts: cfg.contexts })),
     "# Routing rules\n\nFirst matching rule wins; no match uses the default agent.",
     fence("yaml", stringify({ rules: cfg.rules })),
     "# Environment variables",

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { parse, stringify } from "yaml";
-import type { AgentConfig, AgentName, Config, OutputKind } from "./types.js";
+import type { AgentConfig, AgentName, Config, ContextPresets, OutputKind } from "./types.js";
 
 export const AGENT_NAMES: AgentName[] = ["claude", "codex"];
 const OUTPUT_KINDS: OutputKind[] = ["claude-json", "codex-jsonl", "text"];
@@ -52,6 +52,19 @@ export const DEFAULT_CONFIG: Config = {
       defaultCooldownSec: 3600,
     },
   },
+  contexts: {
+    lean: {
+      claude: ["--setting-sources", "project", "--disable-slash-commands"],
+      codex: ["--disable", "hooks", "--disable", "plugins", "--disable", "apps"],
+    },
+    minimal: {
+      claude: ["--safe-mode"],
+      codex: [
+        "--disable", "hooks", "--disable", "plugins", "--disable", "apps",
+        "--disable", "multi_agent", "--disable", "goals", "--disable", "image_generation",
+      ],
+    },
+  },
   rules: [
     { match: "refactor|architecture|migrate|redesign", agent: "claude" },
     { match: "typo|rename|quick|small fix|one-liner", agent: "codex" },
@@ -77,6 +90,17 @@ function mergeAgent(name: AgentName, user: Record<string, unknown> | undefined):
   return merged;
 }
 
+/** User presets add to or override the built-in ones, per preset name and per agent. */
+function mergeContexts(user: unknown): ContextPresets {
+  const merged: ContextPresets = structuredClone(DEFAULT_CONFIG.contexts);
+  if (user && typeof user === "object") {
+    for (const [name, preset] of Object.entries(user as Record<string, unknown>)) {
+      merged[name] = preset && typeof preset === "object" ? { ...merged[name], ...(preset as object) } : (preset as never);
+    }
+  }
+  return merged;
+}
+
 export function loadConfig(path?: string): Config {
   const file = path ?? process.env.ORCH_CONFIG ?? join(orchHome(), "config.yaml");
   if (!existsSync(file)) return structuredClone(DEFAULT_CONFIG);
@@ -88,6 +112,7 @@ export function loadConfig(path?: string): Config {
       codex: mergeAgent("codex", raw.agents?.codex),
     },
     rules: raw.rules ?? structuredClone(DEFAULT_CONFIG.rules),
+    contexts: mergeContexts(raw.contexts),
   };
   validate(cfg);
   return cfg;
@@ -105,7 +130,21 @@ function validate(cfg: Config): void {
   if (!AGENT_NAMES.includes(cfg.defaultAgent)) {
     throw new Error(`defaultAgent must be one of ${AGENT_NAMES.join(", ")}`);
   }
+  for (const [name, preset] of Object.entries(cfg.contexts)) {
+    if (!preset || typeof preset !== "object" || Array.isArray(preset)) {
+      throw new Error(`contexts.${name} must map agent names to argument lists`);
+    }
+    for (const [agent, args] of Object.entries(preset)) {
+      if (!AGENT_NAMES.includes(agent as AgentName)) throw new Error(`contexts.${name}: unknown agent "${agent}"`);
+      if (!Array.isArray(args) || !args.every((a) => typeof a === "string")) {
+        throw new Error(`contexts.${name}.${agent} must be a list of strings`);
+      }
+    }
+  }
   for (const rule of cfg.rules) {
+    if (rule.context !== undefined && !Object.hasOwn(cfg.contexts, rule.context)) {
+      throw new Error(`rule "${rule.match}" uses unknown context "${rule.context}"`);
+    }
     if (!AGENT_NAMES.includes(rule.agent)) {
       throw new Error(`rule agent "${rule.agent}" must be one of ${AGENT_NAMES.join(", ")}`);
     }

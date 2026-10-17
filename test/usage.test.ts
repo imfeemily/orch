@@ -82,6 +82,11 @@ describe("summarize", () => {
     });
   });
 
+  it("groups by context and labels a missing one (none)", () => {
+    const rows = summarize([entry({ context: "lean" }), entry({ context: "lean" }), entry()], "context");
+    expect(rows.map((r) => [r.key, r.tasks]).sort()).toEqual([["(none)", 1], ["lean", 2]]);
+  });
+
   it("labels a missing model (default)", () => {
     expect(summarize(entries, "model").map((r) => r.key).sort()).toEqual(["(default)", "opus"]);
   });

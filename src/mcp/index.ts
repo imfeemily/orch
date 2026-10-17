@@ -18,13 +18,13 @@ const text = (t: string, isError = false) => ({
 server.tool(
   "orch_run",
   "Run a coding task via orch. Routes to Claude Code or Codex and fails over to the other on rate limit or failure.",
-  { prompt: z.string(), cwd: z.string().optional() },
-  async ({ prompt, cwd }) => {
+  { prompt: z.string(), cwd: z.string().optional(), context: z.string().optional() },
+  async ({ prompt, cwd, context }) => {
     await connectOrStart(sock);
     const depth = Number(process.env.ORCH_DEPTH ?? 0) || 0;
     const final = await sendRequest(
       sock,
-      { type: "run", prompt, cwd: resolve(cwd ?? process.cwd()), depth },
+      { type: "run", prompt, cwd: resolve(cwd ?? process.cwd()), depth, context },
       () => {},
     );
     if (final.type === "error") return text(final.message, true);

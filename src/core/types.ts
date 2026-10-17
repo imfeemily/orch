@@ -48,12 +48,18 @@ export interface RouteRule {
   model?: string;
   /** effort level for this agent when the rule matches (needs the agent's effortArgs) */
   effort?: string;
+  /** name of a `contexts` preset to apply (works for whichever agent runs) */
+  context?: string;
 }
+
+/** Named sets of extra CLI flags per agent, used to shrink the fixed context of each call. */
+export type ContextPresets = Record<string, Partial<Record<AgentName, string[]>>>;
 
 export interface Config {
   defaultAgent: AgentName;
   agents: Record<AgentName, AgentConfig>;
   rules: RouteRule[];
+  contexts: ContextPresets;
 }
 
 export interface RunResult {
@@ -106,4 +112,5 @@ export interface JobEntry {
   failedOver: boolean;
   promptPreview: string;
   model?: string;
+  context?: string;
 }
