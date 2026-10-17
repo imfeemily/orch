@@ -4,7 +4,7 @@ import { classify, relevantText } from "./detector.js";
 import { buildHandoff } from "./handoff.js";
 import { parseAgentOutput } from "./output.js";
 import { parseResetTime } from "./reset.js";
-import { type Route, otherAgent, pickRoute } from "./router.js";
+import { type Route, otherAgent, pickRoleRoute, pickRoute } from "./router.js";
 import type { StateStore } from "./state.js";
 import type { AgentName, Attempt, Config, RunFn, TaskResult } from "./types.js";
 import type { Ledger } from "./usage.js";
@@ -25,6 +25,10 @@ export interface TaskRequest {
   signal?: AbortSignal;
   /** name of a `contexts` preset; overrides the matching rule's */
   context?: string;
+  /** name of a role: its agent, model, effort, context and agent args apply */
+  role?: string;
+  /** groups the runs of one team in the ledger (used as the task id) */
+  runId?: string;
 }
 
 const LOGIN_HINT: Record<AgentName, string> = {
@@ -76,6 +80,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
   const record = (res: TaskResult): TaskResult => {
     state.appendJob({
       ...(contextName ? { context: contextName } : {}),
+      ...(req.role ? { role: req.role } : {}),
       ...(route?.model && res.agent === route.agent ? { model: route.model } : {}),
       at: now(),
       agent: res.agent,
@@ -108,27 +113,45 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     };
   }
 
-  const route = pickRoute(config, req.prompt, cooling);
+  const roleCfg = req.role !== undefined && Object.hasOwn(config.roles, req.role) ? config.roles[req.role] : undefined;
+  if (req.role !== undefined && !roleCfg) {
+    return {
+      status: "rejected",
+      agent: null,
+      output: "",
+      failedOver: false,
+      attempts: [],
+      message: `unknown role "${req.role}"; available: ${Object.keys(config.roles).join(", ") || "(none)"}`,
+    };
+  }
+
+  const route = roleCfg
+    ? pickRoleRoute(config, roleCfg, req.prompt, cooling)
+    : pickRoute(config, req.prompt, cooling);
   if (!route) {
+    const pinnedTo = roleCfg && roleCfg.needs.length > 0 ? (roleCfg.agent ?? "codex") : undefined;
     return record({
       status: "unavailable",
       agent: null,
       output: "",
       failedOver: false,
       attempts: [],
-      message: `Both agents are cooling down (${describeCooldowns()})`,
+      message: pinnedTo
+        ? `role "${req.role}" needs ${pinnedTo}, which is cooling down (${describeCooldowns()})`
+        : `Both agents are cooling down (${describeCooldowns()})`,
     });
   }
 
   contextName = req.context ?? route.context;
   const first = route.agent;
   const routedModel = route.model;
-  const taskId = randomUUID().slice(0, 8);
+  const taskId = req.runId ?? randomUUID().slice(0, 8);
   const runAttempt = async (agent: AgentName, prompt: string, choice: Route = { agent }) => {
     const cfg = config.agents[agent];
     const startedAt = now();
     const contextArgs = contextName ? config.contexts[contextName]?.[agent] : undefined;
-    const result = await run(cfg.command, buildAgentArgs(cfg, { ...choice, contextArgs }), prompt, {
+    const roleArgs = roleCfg?.agentArgs?.[agent];
+    const result = await run(cfg.command, buildAgentArgs(cfg, { ...choice, contextArgs, roleArgs }), prompt, {
       cwd: req.cwd,
       depth: req.depth,
       // JSON agents print machine output; only plain-text agents are streamed live.
@@ -164,6 +187,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       agent,
       ...(model ? { model } : {}),
       ...(contextName ? { context: contextName } : {}),
+      ...(req.role ? { role: req.role } : {}),
       outcome,
       ...(parsed.usage ? { usage: parsed.usage } : {}),
       durationMs: now() - startedAt,
@@ -195,6 +219,21 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       attempts: [a1.attempt],
       streamed: a1.streamed,
       message: "aborted by caller",
+    });
+  }
+
+  if (roleCfg && roleCfg.needs.length > 0) {
+    return record({
+      status: "failed",
+      agent: first,
+      output: a1.text,
+      failedOver: false,
+      attempts: [a1.attempt],
+      streamed: a1.streamed,
+      message: withAuthHints(
+        `${first} ${a1.outcome}; role "${req.role}" needs ${roleCfg.needs.join(", ")} and cannot fail over`,
+        [a1.attempt],
+      ),
     });
   }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "../src/core/config.js";
-import { otherAgent, pickAgent, pickRoute } from "../src/core/router.js";
+import { otherAgent, pickAgent, pickRoleRoute, pickRoute } from "../src/core/router.js";
+import type { RoleConfig } from "../src/core/types.js";
 import type { Config } from "../src/core/types.js";
 
 const withModels: Config = {
@@ -66,5 +67,33 @@ describe("otherAgent", () => {
   it("flips", () => {
     expect(otherAgent("claude")).toBe("codex");
     expect(otherAgent("codex")).toBe("claude");
+  });
+});
+
+describe("pickRoleRoute", () => {
+  const role = (over: Partial<RoleConfig> = {}): RoleConfig => ({ prompt: "p", needs: [], writes: false, ...over });
+
+  it("uses the role's agent, model, effort and context", () => {
+    const r = role({ agent: "codex", model: "gpt-6-luna", effort: "low", context: "lean" });
+    expect(pickRoleRoute(DEFAULT_CONFIG, r, "task", () => false)).toEqual({
+      agent: "codex", model: "gpt-6-luna", effort: "low", context: "lean",
+    });
+  });
+
+  it("falls back to normal routing for the agent when the role does not pin one", () => {
+    expect(pickRoleRoute(DEFAULT_CONFIG, role(), "add a page", () => false)).toEqual({ agent: "claude" });
+    expect(pickRoleRoute(DEFAULT_CONFIG, role(), "fix a typo", () => false)).toEqual({ agent: "codex" });
+  });
+
+  it("moves to the other agent when the preferred one is cooling, keeping only the context", () => {
+    const r = role({ agent: "claude", model: "haiku", context: "lean" });
+    expect(pickRoleRoute(DEFAULT_CONFIG, r, "t", (a) => a === "claude")).toEqual({ agent: "codex", context: "lean" });
+    expect(pickRoleRoute(DEFAULT_CONFIG, r, "t", () => true)).toBeNull();
+  });
+
+  it("pins a role that needs a capability to codex and never moves it", () => {
+    const r = role({ needs: ["image"] });
+    expect(pickRoleRoute(DEFAULT_CONFIG, r, "t", () => false)).toEqual({ agent: "codex" });
+    expect(pickRoleRoute(DEFAULT_CONFIG, r, "t", (a) => a === "codex")).toBeNull();
   });
 });

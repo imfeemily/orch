@@ -140,6 +140,7 @@ export interface JobEntry {
   promptPreview: string;
   model?: string;
   context?: string;
+  role?: string;
 }
 
 export interface RoleResult {

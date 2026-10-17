@@ -87,6 +87,11 @@ describe("summarize", () => {
     expect(rows.map((r) => [r.key, r.tasks]).sort()).toEqual([["(none)", 1], ["lean", 2]]);
   });
 
+  it("groups by role and labels a missing one (none)", () => {
+    const rows = summarize([entry({ role: "reviewer" }), entry({ role: "reviewer" }), entry()], "role");
+    expect(rows.map((r) => [r.key, r.tasks]).sort()).toEqual([["(none)", 1], ["reviewer", 2]]);
+  });
+
   it("labels a missing model (default)", () => {
     expect(summarize(entries, "model").map((r) => r.key).sort()).toEqual(["(default)", "opus"]);
   });

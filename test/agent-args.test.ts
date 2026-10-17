@@ -33,6 +33,12 @@ describe("buildAgentArgs", () => {
     expect(buildAgentArgs(claude, { contextArgs: [] })).toEqual(claude.args);
   });
 
+  it("inserts role args after context args, before --", () => {
+    expect(buildAgentArgs(claude, { contextArgs: ["--disable-slash-commands"], roleArgs: ["--permission-mode", "acceptEdits"] })).toEqual([
+      "-p", "--output-format", "json", "--disable-slash-commands", "--permission-mode", "acceptEdits", "--", "{prompt}",
+    ]);
+  });
+
   it("ignores a model when the agent has no modelArgs template", () => {
     const cfg = { ...claude, modelArgs: undefined };
     expect(buildAgentArgs(cfg, { model: "x" })).toEqual(claude.args);

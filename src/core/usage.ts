@@ -13,6 +13,7 @@ export interface LedgerEntry {
   agent: AgentName;
   model?: string;
   context?: string;
+  role?: string;
   outcome: Outcome;
   usage?: Usage;
   durationMs: number;
@@ -79,10 +80,11 @@ export interface UsageRow {
   costUsd: number;
 }
 
-export function summarize(entries: LedgerEntry[], by: "agent" | "model" | "context"): UsageRow[] {
+export function summarize(entries: LedgerEntry[], by: "agent" | "model" | "context" | "role"): UsageRow[] {
   const rows = new Map<string, UsageRow>();
   for (const e of entries) {
-    const key = by === "agent" ? e.agent : by === "model" ? (e.model ?? "(default)") : (e.context ?? "(none)");
+    const key =
+      by === "agent" ? e.agent : by === "model" ? (e.model ?? "(default)") : by === "context" ? (e.context ?? "(none)") : (e.role ?? "(none)");
     const row =
       rows.get(key) ??
       { key, tasks: 0, inputTokens: 0, cacheReadTokens: 0, outputTokens: 0, billableTokens: 0, costUsd: 0 };

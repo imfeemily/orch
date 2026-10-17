@@ -5,6 +5,8 @@ export interface ModelChoice {
   effort?: string;
   /** extra flags from a context preset for this agent */
   contextArgs?: string[];
+  /** extra flags a role asks for this agent (for example permission flags) */
+  roleArgs?: string[];
 }
 
 /**
@@ -21,6 +23,7 @@ export function buildAgentArgs(cfg: AgentConfig, choice: ModelChoice): string[] 
     extra.push(...cfg.effortArgs.map((a) => a.split("{effort}").join(choice.effort!)));
   }
   if (choice.contextArgs?.length) extra.push(...choice.contextArgs);
+  if (choice.roleArgs?.length) extra.push(...choice.roleArgs);
   if (extra.length === 0) return cfg.args;
 
   let at = cfg.args.indexOf("--");

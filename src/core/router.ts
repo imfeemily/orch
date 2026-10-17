@@ -1,4 +1,4 @@
-import type { AgentName, Config, RouteRule } from "./types.js";
+import type { AgentName, Config, RoleConfig, RouteRule } from "./types.js";
 
 export function otherAgent(a: AgentName): AgentName {
   return a === "claude" ? "codex" : "claude";
@@ -46,4 +46,29 @@ export function pickAgent(
   isCooling: (a: AgentName) => boolean,
 ): AgentName | null {
   return pickRoute(config, prompt, isCooling)?.agent ?? null;
+}
+
+/**
+ * Route for a role: its pinned agent (or the one normal routing would pick), with the role's own
+ * model, effort and context. A role that needs a capability only runs on codex and never moves.
+ */
+export function pickRoleRoute(
+  config: Config,
+  role: RoleConfig,
+  prompt: string,
+  isCooling: (a: AgentName) => boolean,
+): Route | null {
+  const pinned = role.needs.length > 0;
+  const preferred: AgentName = role.agent ?? (pinned ? "codex" : (matchRule(config, prompt)?.agent ?? config.defaultAgent));
+  if (!isCooling(preferred)) {
+    const route: Route = { agent: preferred };
+    if (role.model) route.model = role.model;
+    if (role.effort) route.effort = role.effort;
+    if (role.context) route.context = role.context;
+    return route;
+  }
+  if (pinned) return null;
+  const alt = otherAgent(preferred);
+  if (isCooling(alt)) return null;
+  return role.context ? { agent: alt, context: role.context } : { agent: alt };
 }
