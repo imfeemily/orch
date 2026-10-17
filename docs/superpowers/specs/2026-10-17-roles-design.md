@@ -129,16 +129,15 @@ Text diagrams (Mermaid) written by the architecture role do not need Codex and a
 - A question or explanation with no change intent (explain, what, where, why, how does) selects **no roles**: it runs as a plain
   call, the cheapest path.
 - Otherwise `developer` is always chosen, plus any of these when their words appear in the prompt (word lists are defaults in
-  code and overridable under `auto.keywords`):
+  code and extended under `auto.keywords`, which adds to the built-in words):
   - `tester`: test, bug, fix, regression, feature, implement
-  - `reviewer`: refactor, migrate, implement, feature, large (also when the prompt is long)
+  - `reviewer`: refactor, migrate, implement, feature (also when the prompt is long)
   - `security`: auth, login, token, password, secret, crypto, sql, upload, permission, payment
   - `architecture`: architecture, design the, module, boundary, api design, migrate
   - `designer`: ui, ux, screen, layout, mockup, wireframe, diagram, image, logo
 - If more than `auto.maxRoles` match, keep the highest-priority ones: developer, then security, tester, reviewer,
   architecture, designer. The dropped roles are listed in the reasons.
-- `orch explain "<prompt>"` prints the selection and reasons without running anything. A normal auto run prints one line:
-  `orch: roles developer, tester, reviewer (auto)`.
+- `orch explain "<prompt>"` prints the selection and reasons without running anything. A normal auto run prints `auto: roles developer, tester, reviewer` and the reasons on stderr.
 
 ## Data model and interfaces
 

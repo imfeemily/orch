@@ -35,6 +35,8 @@ orch explain "fix the typo in README"                         # which roles --au
 
 - `--role`, `--roles` and `--team` cannot be combined. `--dry-run`, `--require-codex` and `--keep-going` only apply with one of them; without one orch rejects them instead of ignoring them.
 - `--auto` selects the roles from the prompt (no model call); `--no-auto` turns off `auto.enabled` for one run. `--auto` cannot be combined with `--role`, `--roles` or `--team`. `orch explain "<prompt>"` shows the selection without running.
+- `--` ends the options: everything after it is the prompt, even words that start with `--` (`orch run -- "explain what --force does"`).
+- Team runs print one progress line per role on stderr (`orch: developer: started (claude)`, `orch: developer: ok`), so a long run is not silent. The answer still goes to stdout.
 - `--dry-run` prints the roles, their agents and the number of model calls without running anything.
 - `--require-codex` stops before anything runs when a role needs Codex and Codex is not ready; without it that role is skipped.
 - `--keep-going` continues with the remaining roles after one fails; by default the team stops.
@@ -53,9 +55,10 @@ orch usage --by context            # compare context presets
 orch usage --by role               # what each role cost
 ```
 
+- `tasks` counts distinct tasks (a failover is still one task); `tokens` adds up every attempt of those tasks, including the failed one before a failover.
 - The token figure is *billable tokens*: input excluding cache reads, plus output (reasoning is already inside output). It is an approximation for tracking quota, not the vendor's own accounting.
 - Claude also reports a cost in USD; Codex reports tokens only.
-- `orch status` shows the last 24 hours per agent, and the MCP `orch_run` result ends with `tokens=<n>` (billable tokens of the final attempt).
+- `orch status` shows the last 24 hours per agent, and the MCP `orch_run` result ends with `tokens=<n>` (billable tokens of all attempts).
 - Agents are started in JSON mode (`--output-format json` for Claude, `--json` for Codex), so `orch run` prints only the final answer, once, when the agent finishes.
 
 ## From Claude Code and Codex (MCP)

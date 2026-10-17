@@ -77,11 +77,15 @@ roles:
 
 การสร้างภาพผ่าน Codex แบบ headless ใช้งานได้: ในการทดสอบมันสร้างไฟล์ PNG ที่ถูกต้องตาม path ที่สั่ง ต้องใช้ `-s workspace-write` ซึ่ง `designer` ในตัวมีให้แล้ว แต่ก็แพง: โลโก้เล็กๆ หนึ่งอันใช้ input ราว 121,000 โทเค่นของโควต้า Codex (ส่วนใหญ่เป็น cache) จากการเรียกเครื่องมือหลายรอบ จึงควรรัน role สร้างภาพเมื่อตั้งใจเท่านั้น
 
-ถ้าคุณส่ง [context preset](/th/guide/configuration#context-presets) ที่ปิดการสร้างภาพของ Codex (`minimal` ในตัวปิด) role สร้างภาพจะถูกข้ามพร้อมเหตุผลนั้น แทนที่จะรันโดยไม่มีความสามารถ
+ถ้า [context preset](/th/guide/configuration#context-presets), `agentArgs` ของ role เอง หรือ `args` พื้นฐานของเอเจนต์ ปิดการสร้างภาพของ Codex (`--disable image_generation`, `--disable=image_generation` หรือ `-c features.image_generation=false` โดย flag ตัวสุดท้ายชนะ; `minimal` ในตัวปิด) role สร้างภาพจะถูกข้ามพร้อมเหตุผลนั้น แทนที่จะรันโดยไม่มีความสามารถ
+
+role ที่ถูกข้ามเมื่อถึงคิว (เช่น Codex ติด limit ระหว่าง role ก่อนหน้า) ยังคงครองที่ในชุดขนานเดิม ชุดไม่ถูกเติมใหม่ ทุกสมาชิกจึงเริ่มจาก handoff ชุดเดียวกัน
+
+อีกสองข้อ: โน้ต "Earlier roles" ที่ส่งให้ role ถูกระบุว่าเป็นข้อมูล ไม่ใช่คำสั่ง และ `--context` ที่ไม่รู้จักจะถูกปฏิเสธก่อนเริ่มรัน
 
 ## ภาพและ diagram
 
-role ที่มี `needs` จะได้โฟลเดอร์ assets คือ `.orch/runs/<run-id>/assets/` ซึ่ง orch สร้างให้และระบุไว้ท้าย prompt ของ role และสั่งให้บันทึกไฟล์ภาพและ diagram ที่นั่นเท่านั้น เมื่อ role จบ orch จะ **แสดงรายการไฟล์ที่อยู่ในโฟลเดอร์นั้นจริง** (`orch run` พิมพ์ส่วน `assets:` ผล MCP ก็แสดงรายการ) ไม่ได้อ่านชื่อไฟล์จากข้อความของ model ดังนั้น role ที่อ้างถึงไฟล์ที่ไม่ได้เขียนจะถูกรายงานว่าไม่มีไฟล์
+role ที่มี `needs` จะได้โฟลเดอร์ assets คือ `.orch/runs/<run-id>/assets/<role>/` (หนึ่งโฟลเดอร์ต่อ role จึงไม่แชร์ไฟล์กัน) ซึ่ง orch สร้างให้และระบุไว้ท้าย prompt ของ role และสั่งให้บันทึกไฟล์ภาพและ diagram ที่นั่นเท่านั้น เมื่อ role จบ orch จะ **แสดงรายการไฟล์ที่อยู่ในโฟลเดอร์นั้นจริง** (`orch run` พิมพ์ส่วน `assets:` ผล MCP ก็แสดงรายการ) แสดงเฉพาะไฟล์ปกติ (ไม่นับ symbolic link) และไม่ได้อ่านชื่อไฟล์จากข้อความของ model ดังนั้น role ที่อ้างถึงไฟล์ที่ไม่ได้เขียนจะถูกรายงานว่าไม่มีไฟล์
 
 `designer` มีสิทธิ์เขียนไฟล์ (พก `-s workspace-write`) เพื่อบันทึกภาพ มีเพียง prompt เท่านั้นที่กันไม่ให้แตะไฟล์โปรเจกต์ จึงควรดู `git status` หลังรัน
 
@@ -92,7 +96,7 @@ diagram แบบข้อความไม่ต้องใช้ Codex: role
 `orch run --auto "..."` เลือก role ให้ด้วยกฎคำสำคัญธรรมดา ไม่เรียก model จึงไม่เสียโทเค่นในการเลือก เปิดใช้กับทุกการรันด้วย `auto.enabled: true` ใน config และใช้ `--no-auto` เพื่อข้ามในรันเดียว
 
 - **คำถามหรือการอธิบาย** จะไม่เลือก role ใดเลย และรันเป็นการเรียกครั้งเดียว ซึ่งถูกที่สุด หมายถึง prompt ที่ลงท้ายด้วยเครื่องหมายคำถาม ขึ้นต้นด้วยคำถาม (explain, what, how is, can, should, ...) โดยไม่มีคำกริยาที่ขอให้เปลี่ยน หรือมีคำถามภาษาไทย (อธิบาย, ทำไม, อย่างไร, ไหม, ...) โดยไม่มีคำที่ขอให้เปลี่ยนแปลง (เพิ่ม, แก้, สร้าง, ...) คำขอสุภาพให้เปลี่ยนบางอย่าง ("can you add...", "please fix...") นับเป็นการเปลี่ยนแปลง
-- งานอื่นเลือก `developer` เสมอ บวก: `tester` เมื่อมี test, bug, fix, regression, feature, implement; `reviewer` เมื่อมี refactor, migrate, implement, feature หรือ prompt ยาว; `security` เมื่อมี auth, login, token, password, secret, crypto, sql, upload, permission, payment; `architecture` เมื่อมี architecture, "design the", module, boundary, "api design", migrate; `designer` เมื่อมี ui, ux, screen, layout, mockup, wireframe, diagram, image, logo จับคู่ทั้งคำ ไม่สนตัวพิมพ์ และรับคำลงท้ายทั่วไป (tests, fixing, migrated, boundaries) เพิ่มคำของคุณเองใน `auto.keywords` role ที่คุณสร้างเองก็ใส่คำได้ที่นั่นและจะถูกเลือกเป็นลำดับสุดท้าย
+- งานอื่นเลือก `developer` เสมอ บวก: `tester` เมื่อมี test, bug, fix, regression, feature, implement; `reviewer` เมื่อมี refactor, migrate, implement, feature หรือ prompt ยาว; `security` เมื่อมี auth, login, token, password, secret, crypto, sql, upload, permission, payment; `architecture` เมื่อมี architecture, "design the", module, boundary, "api design", migrate; `designer` เมื่อมี ui, ux, screen, layout, mockup, wireframe, diagram, image, logo จับคู่ทั้งคำ ไม่สนตัวพิมพ์ และรับคำลงท้ายทั่วไป (tests, fixing, migrated, boundaries) คำที่ขึ้นต้นหรือลงท้ายด้วยสัญลักษณ์ (`.env`, `c++`) จับคู่ได้ และคำอังกฤษที่ติดกับข้อความไทยก็นับ เมื่อคำถามไม่เลือก role ใดเลย flag ที่ใช้กับ role เท่านั้น (`--require-codex`, `--keep-going`, `--sequential`) จะถูกละเว้นและเหตุผลของการเลือกจะบอกไว้ เพิ่มคำของคุณเองใน `auto.keywords` role ที่คุณสร้างเองก็ใส่คำได้ที่นั่นและจะถูกเลือกเป็นลำดับสุดท้าย
 - รันไม่เกิน `auto.maxRoles` role (ค่าเริ่มต้น 3) ถ้าตรงมากกว่านั้นจะเก็บตามลำดับ `developer`, `security`, `tester`, `reviewer`, `architecture`, `designer` และแสดงตัวที่ถูกตัด role ที่เลือกรันตามลำดับมาตรฐาน
 - `--auto` ใช้ร่วมกับ `--role`, `--roles` หรือ `--team` ไม่ได้ (error) เมื่อ `auto.enabled: true` การระบุ `--role`, `--roles` หรือ `--team` เองจะชนะในรันนั้น และ `--no-auto` ปิด auto ในรันนั้น
 
