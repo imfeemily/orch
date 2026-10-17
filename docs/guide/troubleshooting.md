@@ -12,7 +12,7 @@
 | With `context: lean` an agent ignores your global permissions or instructions | By design: `lean` skips user-level settings. Put needed permissions in the agent's `args` (for example `--permission-mode acceptEdits`) or in the project's own settings. |
 | `role "x" skipped: not logged in ...` | The role needs Codex and Codex is not ready. Follow the reason (for example `codex login`), or add `--require-codex` to stop instead of skipping. |
 | `designer` skipped with `context preset disables image generation` | You passed a context preset (such as `minimal`) that turns off Codex image generation. Use `lean` or no preset for image roles. |
-| `designer` finished but `assets:` shows no files | The role did not write into `.orch/runs/<run-id>/assets/`. orch lists real files only, so read the role's answer in `.orch/runs/<run-id>/designer.md` and rerun. |
+| `designer` finished but `assets:` shows no files | The role did not write into `.orch/runs/<run-id>/assets/<role>/`. orch lists real files only, so read the role's answer in `.orch/runs/<run-id>/designer.md` and rerun. |
 | `--auto` picked fewer roles than you expected | The prompt has no matching words, or `auto.maxRoles` cut some (the output lists them). Check with `orch explain "<prompt>"`, add words under `auto.keywords`, or raise `auto.maxRoles`. |
 | `unknown role` or `unknown team` | The name is not in `roles` or `teams`; the message lists the valid names. |
 | A team stopped and later roles show `not-run` | A role failed after failover. Fix the cause and rerun, or use `--keep-going`. Full answers are in `.orch/runs/<run-id>/`. |

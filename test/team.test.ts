@@ -226,6 +226,17 @@ describe("runRoles: image roles and assets", () => {
     expect(r2.plan![0].skipReason).toContain("disables image generation");
   });
 
+  it("honours flag order across base args, context and role: the role's later --enable beats the preset's --disable", async () => {
+    const s = setup({}, {
+      tweak: (c) => {
+        c.contexts.off = { codex: ["--disable", "image_generation"] };
+        c.roles.pic.agentArgs = { codex: ["--enable", "image_generation"] };
+      },
+    });
+    const r = await go(s, { roles: ["pic"] }, { context: "off", dryRun: true });
+    expect(r.plan![0].skipReason).toBeUndefined();
+  });
+
   it("reports an empty list when the role left no files, and never invents files from its text", async () => {
     const s = setup({ pic: ok("I saved /tmp/fake.png\n## Handoff\ndone") });
     const r = await go(s, { roles: ["pic"] });

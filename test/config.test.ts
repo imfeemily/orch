@@ -185,6 +185,10 @@ describe("loadConfig", () => {
     expect(cfg.roles.reviewer.writes).toBe(false); // built-in values are unchanged
   });
 
+  it("rejects a timeoutSec too large for a timer", () => {
+    expect(() => loadConfig(tmpFile("agents:\n  claude:\n    timeoutSec: 3000000\n"))).toThrow(/timeoutSec/);
+  });
+
   it("accepts a positive agent timeoutSec and rejects anything else", () => {
     expect(loadConfig(tmpFile("agents:\n  claude:\n    timeoutSec: 600\n")).agents.claude.timeoutSec).toBe(600);
     for (const v of ["0", "-5", "soon"]) {

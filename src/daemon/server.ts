@@ -48,10 +48,17 @@ function acquireStartLock(lockPath: string): () => void {
       if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
       let alive = false;
       try {
+        const age = Date.now() - statSync(lockPath).mtimeMs;
         const pid = Number(readFileSync(lockPath, "utf8"));
-        if (pid > 0) {
-          process.kill(pid, 0);
-          alive = true;
+        if (pid > 0 && age < 10_000) {
+          try {
+            process.kill(pid, 0);
+            alive = true;
+          } catch (err) {
+            alive = (err as NodeJS.ErrnoException).code === "EPERM";
+          }
+        } else if (pid <= 0 || Number.isNaN(pid)) {
+          alive = age < 5_000; // the holder has created the file but not written its pid yet
         }
       } catch {
         alive = false;

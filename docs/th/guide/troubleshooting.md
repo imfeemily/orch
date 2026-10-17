@@ -12,7 +12,7 @@
 | ใช้ `context: lean` แล้วเอเจนต์ไม่ใช้สิทธิ์หรือคำสั่งส่วนกลางของคุณ | เป็นไปตามดีไซน์: `lean` ข้ามการตั้งค่าระดับผู้ใช้ ให้ใส่สิทธิ์ที่ต้องการใน `args` ของเอเจนต์ (เช่น `--permission-mode acceptEdits`) หรือในการตั้งค่าของโปรเจกต์เอง |
 | `role "x" skipped: not logged in ...` | role นั้นต้องใช้ Codex และ Codex ไม่พร้อม ทำตามเหตุผลที่แจ้ง (เช่น `codex login`) หรือใส่ `--require-codex` เพื่อหยุดแทนการข้าม |
 | `designer` ถูกข้ามด้วย `context preset disables image generation` | คุณส่ง context preset (เช่น `minimal`) ที่ปิดการสร้างภาพของ Codex ใช้ `lean` หรือไม่ใช้ preset กับ role สร้างภาพ |
-| `designer` จบแล้วแต่ `assets:` ไม่มีไฟล์ | role ไม่ได้เขียนไฟล์ลง `.orch/runs/<run-id>/assets/` orch แสดงเฉพาะไฟล์จริง ให้อ่านคำตอบของ role ที่ `.orch/runs/<run-id>/designer.md` แล้วรันใหม่ |
+| `designer` จบแล้วแต่ `assets:` ไม่มีไฟล์ | role ไม่ได้เขียนไฟล์ลง `.orch/runs/<run-id>/assets/<role>/` orch แสดงเฉพาะไฟล์จริง ให้อ่านคำตอบของ role ที่ `.orch/runs/<run-id>/designer.md` แล้วรันใหม่ |
 | `--auto` เลือก role น้อยกว่าที่คาด | prompt ไม่มีคำที่ตรง หรือ `auto.maxRoles` ตัดบางตัว (ผลลัพธ์แสดงรายการที่ถูกตัด) ตรวจด้วย `orch explain "<prompt>"` เพิ่มคำใน `auto.keywords` หรือเพิ่ม `auto.maxRoles` |
 | `unknown role` หรือ `unknown team` | ชื่อไม่อยู่ใน `roles` หรือ `teams` ข้อความจะแสดงชื่อที่ใช้ได้ |
 | ทีมหยุดและ role ที่เหลือขึ้น `not-run` | มี role ล้มหลัง failover แก้สาเหตุแล้วรันใหม่ หรือใช้ `--keep-going` คำตอบเต็มอยู่ที่ `.orch/runs/<run-id>/` |

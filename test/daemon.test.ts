@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, mkdtempSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, statSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -42,6 +42,17 @@ describe("daemon", () => {
     expect(chunks).toEqual(["part1 "]);
     expect(final.type).toBe("result");
     if (final.type === "result") expect(final.result.status).toBe("ok");
+  });
+
+  it("treats a just-created empty start lock as held, and a lock older than 10s as stale even if its pid is alive", async () => {
+    const s = setup(okRun);
+    const lock = `${s.sockPath}.lock`;
+    writeFileSync(lock, "");
+    await expect(startDaemon({ sockPath: s.sockPath, deps: s.deps })).rejects.toThrow(/already starting/);
+    writeFileSync(lock, String(process.pid));
+    const old = new Date(Date.now() - 60_000);
+    utimesSync(lock, old, old);
+    closers.push((await startDaemon({ sockPath: s.sockPath, deps: s.deps })).close);
   });
 
   it("sends progress messages that are not the final reply", async () => {

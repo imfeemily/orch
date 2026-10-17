@@ -36,7 +36,7 @@ rules:
 - `limitPatterns`: case-insensitive regexes. A non-zero exit whose stderr, or last 20 lines of stdout, matches one of them is a rate limit and puts the agent on cooldown.
 - `authPatterns`: same matching; a hit means the agent is not logged in. Checked after `limitPatterns`.
 - `defaultCooldownSec`: cooldown after a rate limit when the message gives no reset time (default 3600).
-- `timeoutSec`: optional positive number. A run that takes longer is stopped and counts as a failure (so it can fail over). Off unless set.
+- `timeoutSec`: optional positive number. A run that takes longer is stopped and counts as a failure (so it can fail over). Off unless set; at most 2147483.
 
 ## Rule keys (`rules[]`)
 

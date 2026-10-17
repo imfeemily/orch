@@ -55,7 +55,7 @@ orch usage --by context            # compare context presets
 orch usage --by role               # what each role cost
 ```
 
-- `tasks` counts distinct tasks (a failover is still one task); `tokens` adds up every attempt of those tasks, including the failed one before a failover.
+- `tasks` counts distinct tasks (a failover is still one task, and a whole team run counts as one task); `tokens` adds up every attempt of those tasks, including the failed one before a failover.
 - The token figure is *billable tokens*: input excluding cache reads, plus output (reasoning is already inside output). It is an approximation for tracking quota, not the vendor's own accounting.
 - Claude also reports a cost in USD; Codex reports tokens only.
 - `orch status` shows the last 24 hours per agent, and the MCP `orch_run` result ends with `tokens=<n>` (billable tokens of all attempts).

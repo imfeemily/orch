@@ -56,7 +56,7 @@ orch usage --by context            # เทียบ context preset
 orch usage --by role               # ต้นทุนของแต่ละ role
 ```
 
-- `tasks` นับจำนวนงานที่ต่างกัน (failover ยังนับเป็นงานเดียว) ส่วน `tokens` รวมทุก attempt ของงานเหล่านั้น รวมครั้งที่ล้มก่อน failover
+- `tasks` นับจำนวนงานที่ต่างกัน (failover ยังนับเป็นงานเดียว และการรัน team ทั้งชุดนับเป็นหนึ่งงาน) ส่วน `tokens` รวมทุก attempt ของงานเหล่านั้น รวมครั้งที่ล้มก่อน failover
 - ตัวเลขโทเค่นคือ *billable tokens*: input ที่ไม่รวม cache read บวก output (reasoning รวมอยู่ใน output แล้ว) เป็นค่าประมาณไว้ติดตามโควต้า ไม่ใช่การนับของผู้ให้บริการ
 - Claude รายงานค่าใช้จ่ายเป็น USD ด้วย ส่วน Codex รายงานเฉพาะโทเค่น
 - `orch status` แสดงยอด 24 ชั่วโมงล่าสุดต่อเอเจนต์ และผลของ MCP `orch_run` ปิดท้ายด้วย `tokens=<n>` (โทเค่นที่คิดเงินได้ของทุก attempt)

@@ -54,11 +54,16 @@ function listAssets(dir: string): string[] {
 /** Why the flags a role would run with (agent base flags, its own, its context preset) block a capability. */
 function flagsBlock(config: Config, role: RoleConfig, agent: AgentName, context: string | undefined): string | undefined {
   if (role.needs.length === 0) return undefined;
-  return (
-    contextBlocks(config.agents[agent].args, role.needs, "the agent's flags") ??
-    contextBlocks(role.agentArgs?.[agent], role.needs, "the role's flags") ??
-    contextBlocks(config.contexts[context ?? role.context ?? ""]?.[agent], role.needs)
-  );
+  // The real command line is base args, then the preset's, then the role's: judge them in that order, last flag wins.
+  const lists: [string[] | undefined, string][] = [
+    [config.agents[agent].args, "the agent's flags"],
+    [config.contexts[context ?? role.context ?? ""]?.[agent], "context preset"],
+    [role.agentArgs?.[agent], "the role's flags"],
+  ];
+  const all = lists.flatMap(([a]) => a ?? []);
+  if (!contextBlocks(all, role.needs)) return undefined;
+  const source = [...lists].reverse().find(([a, label]) => contextBlocks(a, role.needs, label));
+  return contextBlocks(all, role.needs, source?.[1] ?? "the flags");
 }
 
 /**

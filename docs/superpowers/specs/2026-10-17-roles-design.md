@@ -100,7 +100,7 @@ Validation at load: unknown `context`, unknown capability in `needs`, a team nam
   `.orch/runs/<run-id>/<role>.md` and keeps the handoff text (fallback: the last 1,500 characters) for later roles.
 - Summaries passed to a role are capped by `pipeline.handoffChars` (default 4,000) in total, newest first.
 - `.orch/runs/` is created with its own `.gitignore` containing `*`; the user's `.gitignore` is never edited. Image and diagram
-  files a role creates are saved under `.orch/runs/<run-id>/assets/`.
+  files a role creates are saved under `.orch/runs/<run-id>/assets/<role>/`.
 - Writers (`writes: true`) run one at a time. Phase 3 lets adjacent read-only roles (reviewer and security) run in parallel.
 - **Failure:** a role that fails after failover stops the pipeline and the result lists finished, failed and not-run roles.
   `--keep-going` continues with the remaining roles. A skipped role (readiness) is not a failure.
