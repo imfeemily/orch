@@ -55,6 +55,14 @@ describe("runCommand", () => {
     expect(r.stderr).toContain("aborted");
   });
 
+  it("keeps a multi-byte character that arrives split across chunks", async () => {
+    const chunks: string[] = [];
+    const r = await runCommand(node, [FAKE, "split-utf8"], "", { ...base, onChunk: (t) => chunks.push(t) });
+    expect(r.stdout).toBe("ก\n");
+    expect(chunks.join("")).toBe("ก\n");
+    expect(r.stdout).not.toContain("\ufffd");
+  });
+
   it("streams stdout chunks to onChunk", async () => {
     const chunks: string[] = [];
     await runCommand(node, [FAKE, "ok", "x"], "", { ...base, onChunk: (t) => chunks.push(t) });

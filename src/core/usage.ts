@@ -27,7 +27,7 @@ export class Ledger {
   append(entry: LedgerEntry): void {
     try {
       mkdirSync(dirname(this.path), { recursive: true, mode: 0o700 });
-      appendFileSync(this.path, `${JSON.stringify(entry)}\n`);
+      appendFileSync(this.path, `${JSON.stringify(entry)}\n`, { mode: 0o600 });
     } catch {
       /* ignore */
     }
@@ -62,7 +62,7 @@ export class Ledger {
     try {
       const kept = this.readAll().filter((e) => e.at >= now - keepMs);
       const tmp = `${this.path}.${process.pid}.tmp`;
-      writeFileSync(tmp, kept.map((e) => `${JSON.stringify(e)}\n`).join(""));
+      writeFileSync(tmp, kept.map((e) => `${JSON.stringify(e)}\n`).join(""), { mode: 0o600 });
       renameSync(tmp, this.path);
     } catch {
       /* ignore */

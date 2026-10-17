@@ -185,6 +185,13 @@ describe("loadConfig", () => {
     expect(cfg.roles.reviewer.writes).toBe(false); // built-in values are unchanged
   });
 
+  it("accepts a positive agent timeoutSec and rejects anything else", () => {
+    expect(loadConfig(tmpFile("agents:\n  claude:\n    timeoutSec: 600\n")).agents.claude.timeoutSec).toBe(600);
+    for (const v of ["0", "-5", "soon"]) {
+      expect(() => loadConfig(tmpFile(`agents:\n  claude:\n    timeoutSec: ${v}\n`))).toThrow(/timeoutSec/);
+    }
+  });
+
   it("rejects an auto or pipeline block that is not a mapping, unknown keys, and non-mapping keywords", () => {
     const bad = (yaml: string, re: RegExp) => expect(() => loadConfig(tmpFile(yaml))).toThrow(re);
     bad("auto: true\n", /auto must be a mapping/);

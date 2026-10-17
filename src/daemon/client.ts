@@ -22,6 +22,7 @@ export function sendRequest(
 ): Promise<Message> {
   return new Promise((resolve, reject) => {
     const socket = net.connect(sockPath);
+    socket.setEncoding("utf8");
     let buf = "";
     let done = false;
     socket.on("connect", () => socket.write(`${JSON.stringify(req)}\n`));

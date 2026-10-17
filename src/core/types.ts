@@ -38,6 +38,8 @@ export interface AgentConfig {
   /** case-insensitive regexes that mean "not logged in" (checked after limitPatterns) */
   authPatterns: string[];
   defaultCooldownSec: number;
+  /** stop an agent run that takes longer than this many seconds; none by default */
+  timeoutSec?: number;
 }
 
 export interface RouteRule {

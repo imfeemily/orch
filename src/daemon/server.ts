@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, statSync, unlinkSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, statSync, unlinkSync, writeSync } from "node:fs";
 import net from "node:net";
 import { dirname, isAbsolute } from "node:path";
 import { type Deps, runTask } from "../core/orchestrator.js";
@@ -21,12 +21,67 @@ function isDirectory(p: string): boolean {
   }
 }
 
+/** Identifies a socket file: an inode number alone can be reused right after an unlink, so add its change time. */
+function socketId(path: string): string {
+  const s = statSync(path, { bigint: true });
+  return `${s.ino}:${s.ctimeNs}`;
+}
+
+/**
+ * Only one daemon may start at a time: take an exclusive lock file for the duration of the start.
+ * A lock left by a dead process is removed.
+ */
+function acquireStartLock(lockPath: string): () => void {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const fd = openSync(lockPath, "wx", 0o600);
+      writeSync(fd, String(process.pid));
+      closeSync(fd);
+      return () => {
+        try {
+          unlinkSync(lockPath);
+        } catch {
+          /* already gone */
+        }
+      };
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+      let alive = false;
+      try {
+        const pid = Number(readFileSync(lockPath, "utf8"));
+        if (pid > 0) {
+          process.kill(pid, 0);
+          alive = true;
+        }
+      } catch {
+        alive = false;
+      }
+      if (alive) throw new Error(`orch daemon already starting at ${lockPath.replace(/\.lock$/, "")}`);
+      try {
+        unlinkSync(lockPath); // stale lock from a process that died
+      } catch {
+        /* lost a race to another starter; the next attempt will say so */
+      }
+    }
+  }
+  throw new Error(`could not take the start lock ${lockPath}`);
+}
+
 export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promise<void> }> {
   const { sockPath, deps, onShutdown } = opts;
   mkdirSync(dirname(sockPath), { recursive: true, mode: 0o700 });
+  try {
+    chmodSync(dirname(sockPath), 0o700); // a directory made earlier may be group- or world-readable
+  } catch {
+    /* not ours to change */
+  }
+  const release = acquireStartLock(`${sockPath}.lock`);
 
   if (existsSync(sockPath)) {
-    if (await isAlive(sockPath)) throw new Error(`orch daemon already running at ${sockPath}`);
+    if (await isAlive(sockPath)) {
+      release();
+      throw new Error(`orch daemon already running at ${sockPath}`);
+    }
     unlinkSync(sockPath); // stale socket from a crashed daemon
   }
 
@@ -104,6 +159,7 @@ export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promi
   };
 
   const server = net.createServer((socket) => {
+    socket.setEncoding("utf8");
     const ac = new AbortController();
     socket.on("close", () => ac.abort());
     let buf = "";
@@ -119,18 +175,26 @@ export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promi
     socket.on("error", () => {});
   });
 
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(sockPath, () => resolve());
-  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(sockPath, () => resolve());
+    });
+  } catch (e) {
+    release();
+    throw e;
+  }
   chmodSync(sockPath, 0o600);
+  const ours = socketId(sockPath);
+  release();
 
   return {
     close: () =>
       new Promise<void>((resolve) => {
         server.close(() => {
           try {
-            unlinkSync(sockPath);
+            // only remove the socket if it is still ours: a newer daemon may have replaced it
+            if (socketId(sockPath) === ours) unlinkSync(sockPath);
           } catch {
             /* already gone */
           }

@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -27,6 +27,12 @@ describe("Ledger", () => {
     const l = new Ledger(join(dir(), "sub", "usage.jsonl"));
     l.append(entry());
     expect(l.readSince(0)).toEqual([entry()]);
+  });
+
+  it("creates the ledger file readable by its owner only", () => {
+    const p = join(dir(), "usage.jsonl");
+    new Ledger(p).append(entry());
+    expect(statSync(p).mode & 0o777).toBe(0o600);
   });
 
   it("readSince returns only entries at or after the cutoff", () => {

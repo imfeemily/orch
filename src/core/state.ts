@@ -27,7 +27,7 @@ export class StateStore {
   private write(state: StateFile): void {
     mkdirSync(dirname(this.path), { recursive: true, mode: 0o700 });
     const tmp = `${this.path}.${process.pid}.tmp`;
-    writeFileSync(tmp, JSON.stringify(state, null, 2));
+    writeFileSync(tmp, JSON.stringify(state, null, 2), { mode: 0o600 });
     renameSync(tmp, this.path);
   }
 
