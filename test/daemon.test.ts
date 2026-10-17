@@ -169,13 +169,18 @@ describe("daemon", () => {
     expect(seen).toEqual(["ก"]);
   });
 
-  it("leaves a newer daemon's socket alone when an older daemon shuts down late", async () => {
+  it("leaves a newer daemon's socket alone when an older daemon finishes shutting down late", async () => {
     const s = setup(okRun);
     const older = await startDaemon({ sockPath: s.sockPath, deps: s.deps });
-    unlinkSync(s.sockPath); // a replacement daemon takes over the path
+    // an open connection keeps the older daemon's shutdown from completing
+    const held = net.connect(s.sockPath);
+    await new Promise<void>((r) => held.once("connect", () => r()));
+    const closing = older.close(); // stops listening and frees the path at once
+    await new Promise((r) => setTimeout(r, 30));
     const newer = await startDaemon({ sockPath: s.sockPath, deps: s.deps });
     closers.push(newer.close);
-    await older.close();
+    held.destroy(); // now the older daemon's close completes and runs its own cleanup
+    await closing;
     expect(await isAlive(s.sockPath)).toBe(true);
   });
 
