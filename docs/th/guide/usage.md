@@ -12,7 +12,7 @@ orch daemon stop                                # ต้องสั่งหล
 orch usage --since 7d --by model                # ยอดโทเค่นจาก ledger
 ```
 
-- `orch run` แสดงผลของเอเจนต์ทันทีที่ได้ และจบด้วย exit code ไม่เป็นศูนย์ถ้าทั้งสองตัวล้ม เมื่อสลับเอเจนต์จะเห็น
+- `orch run` พิมพ์คำตอบสุดท้ายของเอเจนต์ (เอเจนต์ที่ตั้ง `output: text` จะสตรีมสด) และจบด้วย exit code ไม่เป็นศูนย์ถ้าทั้งสองตัวล้ม เมื่อสลับเอเจนต์จะเห็น
   `orch: switched agent, finished with <agent>` ที่ stderr
 - `orch status` แสดงแต่ละเอเจนต์เป็น `available` หรือ `cooling down, Nm left` ตามด้วยงานล่าสุด งานที่ใช้ model จาก rule จะมีชื่อ model ในวงเล็บเหลี่ยม
 - สถานะอยู่ที่ `~/.orch/state.json` (cooldown และงานล่าสุด 50 รายการ) เปลี่ยนโฟลเดอร์ด้วย `ORCH_HOME`

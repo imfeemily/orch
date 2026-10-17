@@ -36,6 +36,29 @@ describe("loadConfig", () => {
     }
   });
 
+  it("keeps a 0.2.x config in text mode: args without a JSON flag infer output text", () => {
+    const cfg = loadConfig(
+      tmpFile('agents:\n  claude:\n    args: ["-p", "--", "{prompt}"]\n  codex:\n    args: ["exec", "--", "{prompt}"]\n'),
+    );
+    expect(cfg.agents.claude.output).toBe("text");
+    expect(cfg.agents.codex.output).toBe("text");
+  });
+
+  it("infers the JSON kinds from the flags in the user's args", () => {
+    const cfg = loadConfig(
+      tmpFile(
+        'agents:\n  claude:\n    args: ["-p", "--output-format", "json", "--", "{prompt}"]\n  codex:\n    args: ["exec", "--json", "--", "{prompt}"]\n',
+      ),
+    );
+    expect(cfg.agents.claude.output).toBe("claude-json");
+    expect(cfg.agents.codex.output).toBe("codex-jsonl");
+  });
+
+  it("respects an explicit output even when args are overridden", () => {
+    const cfg = loadConfig(tmpFile('agents:\n  claude:\n    args: ["-p", "--", "{prompt}"]\n    output: claude-json\n'));
+    expect(cfg.agents.claude.output).toBe("claude-json");
+  });
+
   it("defaults to JSON output for both agents", () => {
     expect(DEFAULT_CONFIG.agents.claude.output).toBe("claude-json");
     expect(DEFAULT_CONFIG.agents.codex.output).toBe("codex-jsonl");

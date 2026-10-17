@@ -92,6 +92,8 @@ export interface TaskResult {
   output: string;
   failedOver: boolean;
   attempts: Attempt[];
+  /** true when the final answer was already forwarded through onChunk */
+  streamed?: boolean;
   /** token usage of the final attempt, when the agent reported it */
   usage?: Usage;
   message?: string;

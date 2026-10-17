@@ -68,6 +68,25 @@ describe("parseAgentOutput codex-jsonl", () => {
   });
 });
 
+describe("parseAgentOutput robustness", () => {
+  it("codex: an answer that contains a JSON line with a type field is not read as events", () => {
+    const raw = 'Set this in package.json:\n{"type": "module"}\nThen run it.';
+    expect(parseAgentOutput("codex-jsonl", raw)).toEqual({ text: raw });
+    expect(parseAgentOutput("codex-jsonl", '{"type": "module"}')).toEqual({ text: '{"type": "module"}' });
+  });
+
+  it("claude: an error result without a result field keeps its reason and usage", () => {
+    const stdout = JSON.stringify({
+      type: "result", subtype: "error_max_turns", is_error: true, usage: { input_tokens: 3, output_tokens: 2 },
+    });
+    expect(parseAgentOutput("claude-json", stdout)).toEqual({
+      text: "",
+      errorText: "error_max_turns",
+      usage: { inputTokens: 3, cacheReadTokens: 0, outputTokens: 2 },
+    });
+  });
+});
+
 describe("parseAgentOutput fallback", () => {
   for (const kind of ["claude-json", "codex-jsonl"] as const) {
     it(`${kind}: plain text and truncated JSON fall back to the raw text`, () => {

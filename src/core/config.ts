@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { parse, stringify } from "yaml";
-import type { AgentName, Config, OutputKind } from "./types.js";
+import type { AgentConfig, AgentName, Config, OutputKind } from "./types.js";
 
 export const AGENT_NAMES: AgentName[] = ["claude", "codex"];
 const OUTPUT_KINDS: OutputKind[] = ["claude-json", "codex-jsonl", "text"];
@@ -62,6 +62,21 @@ export function orchHome(): string {
   return process.env.ORCH_HOME ?? join(homedir(), ".orch");
 }
 
+/** A user who overrides `args` keeps their flags, so read the output kind from them. */
+function inferOutput(args: unknown): OutputKind {
+  if (!Array.isArray(args)) return "text";
+  const i = args.indexOf("--output-format");
+  if (i >= 0 && args[i + 1] === "json") return "claude-json";
+  if (args.includes("--json")) return "codex-jsonl";
+  return "text";
+}
+
+function mergeAgent(name: AgentName, user: Record<string, unknown> | undefined): AgentConfig {
+  const merged: AgentConfig = { ...DEFAULT_CONFIG.agents[name], ...(user ?? {}) };
+  if (user?.args !== undefined && user.output === undefined) merged.output = inferOutput(user.args);
+  return merged;
+}
+
 export function loadConfig(path?: string): Config {
   const file = path ?? process.env.ORCH_CONFIG ?? join(orchHome(), "config.yaml");
   if (!existsSync(file)) return structuredClone(DEFAULT_CONFIG);
@@ -69,8 +84,8 @@ export function loadConfig(path?: string): Config {
   const cfg: Config = {
     defaultAgent: raw.defaultAgent ?? DEFAULT_CONFIG.defaultAgent,
     agents: {
-      claude: { ...DEFAULT_CONFIG.agents.claude, ...(raw.agents?.claude ?? {}) },
-      codex: { ...DEFAULT_CONFIG.agents.codex, ...(raw.agents?.codex ?? {}) },
+      claude: mergeAgent("claude", raw.agents?.claude),
+      codex: mergeAgent("codex", raw.agents?.codex),
     },
     rules: raw.rules ?? structuredClone(DEFAULT_CONFIG.rules),
   };

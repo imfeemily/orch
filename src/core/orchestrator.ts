@@ -151,7 +151,8 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       durationMs: now() - startedAt,
       promptChars: req.prompt.length,
     });
-    return { text: parsed.text, detail: parsed.errorText ?? result.stderr, outcome, attempt };
+    const streamed = cfg.output === "text" && req.onChunk !== undefined;
+    return { text: parsed.text, detail: parsed.errorText ?? result.stderr, outcome, attempt, streamed };
   };
 
   const a1 = await runAttempt(first, req.prompt, route);
@@ -163,6 +164,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       failedOver: false,
       attempts: [a1.attempt],
       usage: a1.attempt.usage,
+      streamed: a1.streamed,
     });
   }
 
@@ -173,6 +175,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       output: a1.text,
       failedOver: false,
       attempts: [a1.attempt],
+      streamed: a1.streamed,
       message: "aborted by caller",
     });
   }
@@ -185,6 +188,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       output: a1.text,
       failedOver: false,
       attempts: [a1.attempt],
+      streamed: a1.streamed,
       message: withAuthHints(
         `${first} ${a1.outcome}; ${second} unavailable (${describeCooldowns()})`,
         [a1.attempt],
@@ -210,6 +214,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     failedOver: true,
     attempts: [a1.attempt, a2.attempt],
     usage: a2.attempt.usage,
+    streamed: a2.streamed,
     message:
       a2.outcome === "ok"
         ? undefined

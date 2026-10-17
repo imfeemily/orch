@@ -12,7 +12,7 @@ orch daemon stop                                # required after editing config.
 orch usage --since 7d --by model                # token usage from the ledger
 ```
 
-- `orch run` streams the agent's output and exits non-zero if both agents fail. When it fails over you will see `orch: switched agent, finished with <agent>` on stderr.
+- `orch run` prints the agent's final answer (an agent configured with `output: text` streams it live) and exits non-zero if both agents fail. When it fails over you will see `orch: switched agent, finished with <agent>` on stderr.
 - `orch status` shows each agent as `available` or `cooling down, Nm left`, followed by the last jobs. A job that used a rule's model shows it in brackets.
 - State lives in `~/.orch/state.json` (cooldowns and the last 50 jobs). Set `ORCH_HOME` to use another directory.
 
@@ -29,7 +29,7 @@ orch usage --since 7d --by model   # last 7 days, per model
 
 - The token figure is *billable tokens*: input excluding cache reads, plus output (reasoning is already inside output). It is an approximation for tracking quota, not the vendor's own accounting.
 - Claude also reports a cost in USD; Codex reports tokens only.
-- `orch status` shows the last 24 hours per agent, and the MCP `orch_run` result ends with `tokens=<n>`.
+- `orch status` shows the last 24 hours per agent, and the MCP `orch_run` result ends with `tokens=<n>` (billable tokens of the final attempt).
 - Agents are started in JSON mode (`--output-format json` for Claude, `--json` for Codex), so `orch run` prints only the final answer, once, when the agent finishes.
 
 ## From Claude Code and Codex (MCP)

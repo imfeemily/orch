@@ -69,21 +69,17 @@ async function main(): Promise<number> {
     case "run": {
       await connectOrStart(sock);
       const depth = Number(process.env.ORCH_DEPTH ?? 0) || 0;
-      let streamed = false;
       const final = await sendRequest(
         sock,
         { type: "run", prompt: cmd.prompt, cwd: resolve(cmd.cwd ?? process.cwd()), depth },
         (m) => {
-          if (m.type === "chunk") {
-            streamed = true;
-            process.stdout.write(m.text);
-          }
+          if (m.type === "chunk") process.stdout.write(m.text);
         },
       );
       if (final.type === "error") throw new Error(final.message);
       if (final.type !== "result") throw new Error("unexpected reply from daemon");
       const r = final.result;
-      process.stdout.write(finalOutputToPrint(streamed, r.output));
+      process.stdout.write(finalOutputToPrint(r.streamed === true, r.output));
       if (r.failedOver) console.error(`\norch: switched agent, finished with ${r.agent}`);
       if (r.status !== "ok") {
         console.error(`orch: ${r.status}${r.message ? `: ${r.message}` : ""}`);

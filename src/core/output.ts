@@ -4,9 +4,12 @@ const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v)
 
 function parseClaude(stdout: string): AgentOutput | null {
   const obj = JSON.parse(stdout.trim());
-  if (!obj || typeof obj !== "object" || typeof obj.result !== "string") return null;
-  const out: AgentOutput = { text: obj.result };
-  if (obj.is_error === true) out.errorText = obj.result;
+  if (!obj || typeof obj !== "object") return null;
+  // Error results (for example error_max_turns) may carry no `result` string.
+  if (typeof obj.result !== "string" && obj.type !== "result") return null;
+  const answer = typeof obj.result === "string" ? obj.result : "";
+  const out: AgentOutput = { text: answer };
+  if (obj.is_error === true) out.errorText = answer || (typeof obj.subtype === "string" ? obj.subtype : "error");
   const u = obj.usage;
   if (u && typeof u === "object") {
     const usage: Usage = {
@@ -44,7 +47,9 @@ function parseCodex(stdout: string): AgentOutput | null {
       /* not an event line */
     }
   }
-  if (events.length === 0) return null;
+  // Real Codex output starts with a thread/turn event; a prose answer that merely
+  // contains a JSON line with a "type" field must not be read as events.
+  if (events.length === 0 || !/^(thread|turn|item)\.|^error$/.test(events[0].type)) return null;
 
   let text = "";
   let usage: Usage | undefined;

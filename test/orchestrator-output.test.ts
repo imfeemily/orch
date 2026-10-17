@@ -128,6 +128,19 @@ describe("chunks and ledger", () => {
     expect(r.status).toBe("ok");
   });
 
+  it("reports whether the final answer was already streamed", async () => {
+    const chunk = (t: string) => void t;
+    const cfg = noSummaryConfig();
+    cfg.agents.claude.output = "text";
+    const textOk = setup({ claude: { exitCode: 0, stdout: "hi", stderr: "" } }, cfg);
+    expect((await go(textOk, "build a page", chunk)).streamed).toBe(true);
+    expect((await go(textOk)).streamed).toBe(false); // no onChunk, nothing streamed
+
+    const mixed = setup({ claude: exit1("boom"), codex: OK_CODEX }, cfg);
+    const r = await go(mixed, "build a page", chunk);
+    expect(r).toMatchObject({ status: "ok", agent: "codex", output: "from codex", streamed: false });
+  });
+
   it("parses the summary call output before handing over", async () => {
     const s = setup(
       {
