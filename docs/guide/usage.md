@@ -31,7 +31,7 @@ orch run --roles developer,tester "fix the bug in parser.ts"  # your own list, i
 orch run --team standard --dry-run "add a test for clamp()"   # show the plan, spend nothing
 ```
 
-- `--role`, `--roles` and `--team` cannot be combined.
+- `--role`, `--roles` and `--team` cannot be combined. `--dry-run`, `--require-codex` and `--keep-going` only apply with one of them; without one orch rejects them instead of ignoring them.
 - `--dry-run` prints the roles, their agents and the number of model calls without running anything.
 - `--require-codex` stops before anything runs when a role needs Codex and Codex is not ready; without it that role is skipped.
 - `--keep-going` continues with the remaining roles after one fails; by default the team stops.

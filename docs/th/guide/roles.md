@@ -52,7 +52,7 @@ role ที่มี `needs: [image]` (เช่น role ที่สร้า�
 - ฟีเจอร์ `image_generation` เปิดอยู่ใน `codex features list`
 - Codex ไม่ติด cooldown จาก rate limit
 
-ถ้า Codex ไม่พร้อม role นั้นจะถูก **ข้าม** พร้อมเหตุผล (เช่น `not logged in: run codex login`) และ role อื่นทำงานต่อ ใส่ `--require-codex` เพื่อหยุดก่อนเริ่มอะไรเลยแทน role ที่ต้องการความสามารถพิเศษจะไม่ถูกย้ายไป Claude เพราะ Claude ทำงานนั้นไม่ได้
+orch ตรวจอีกครั้งก่อน role แบบนี้ทุกตัวรัน ดังนั้นถ้า Codex ติด rate limit ระหว่าง role ก่อนหน้า role นั้นก็ถูกข้ามเช่นกัน ถ้า Codex ไม่พร้อม role นั้นจะถูก **ข้าม** พร้อมเหตุผล (เช่น `not logged in: run codex login`) และ role อื่นทำงานต่อ ใส่ `--require-codex` เพื่อหยุดก่อนเริ่มอะไรเลยแทน role ที่ต้องการความสามารถพิเศษจะไม่ถูกย้ายไป Claude เพราะ Claude ทำงานนั้นไม่ได้
 
 ```yaml
 roles:

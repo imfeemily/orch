@@ -52,7 +52,7 @@ A role with `needs: [image]` (for example one that makes a mockup or diagram ima
 - the `image_generation` feature is enabled in `codex features list`,
 - Codex is not cooling down after a rate limit.
 
-If Codex is not ready, that role is **skipped** with the reason (for example `not logged in: run codex login`) and the other roles continue. Add `--require-codex` to stop before anything runs instead. A role that needs a capability is never moved to Claude, because Claude cannot do the work.
+Orch checks again just before each such role runs, so a role is also skipped if Codex hit a rate limit during an earlier role. If Codex is not ready, that role is **skipped** with the reason (for example `not logged in: run codex login`) and the other roles continue. Add `--require-codex` to stop before anything runs instead. A role that needs a capability is never moved to Claude, because Claude cannot do the work.
 
 ```yaml
 roles:

@@ -77,6 +77,11 @@ describe("daemon", () => {
 
     const bad = await sendRequest(s.sockPath, { type: "run", prompt: "x", cwd: s.dir, depth: 0, role: "reviewer", team: "quick" }, () => {});
     expect(bad.type === "result" && bad.result.status).toBe("rejected");
+
+    // role-only flags without a selector are rejected, not silently ignored
+    const alone = await sendRequest(s.sockPath, { type: "run", prompt: "x", cwd: s.dir, depth: 0, requireCodex: true }, () => {});
+    expect(alone.type === "result" && alone.result.status).toBe("rejected");
+    expect(seen).toHaveLength(0);
   });
 
   it("answers status", async () => {

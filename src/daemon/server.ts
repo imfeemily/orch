@@ -56,7 +56,7 @@ export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promi
         send({ type: "error", message: `cwd must be an existing absolute directory: ${req.cwd}` });
         return;
       }
-      const wantsRoles = req.role !== undefined || req.roles !== undefined || req.team !== undefined || req.dryRun === true;
+      const wantsRoles = req.role !== undefined || req.roles !== undefined || req.team !== undefined || req.dryRun === true || req.requireCodex === true || req.keepGoing === true;
       try {
         if (wantsRoles) {
           const readiness =

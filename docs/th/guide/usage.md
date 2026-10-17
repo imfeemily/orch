@@ -32,7 +32,7 @@ orch run --roles developer,tester "แก้บั๊กใน parser.ts"       
 orch run --team standard --dry-run "เพิ่ม test ให้ clamp()"   # แสดงแผน ไม่เสียโทเค่น
 ```
 
-- `--role`, `--roles` และ `--team` ใช้ร่วมกันไม่ได้
+- `--role`, `--roles` และ `--team` ใช้ร่วมกันไม่ได้ ส่วน `--dry-run`, `--require-codex` และ `--keep-going` ใช้ได้เมื่อมีตัวใดตัวหนึ่งข้างต้นเท่านั้น ถ้าไม่มี orch จะปฏิเสธแทนการเมิน
 - `--dry-run` แสดง role เอเจนต์ของมัน และจำนวนการเรียก model โดยไม่รันอะไร
 - `--require-codex` หยุดก่อนเริ่มเมื่อมี role ที่ต้องใช้ Codex และ Codex ไม่พร้อม ถ้าไม่ใส่ role นั้นจะถูกข้าม
 - `--keep-going` รัน role ที่เหลือต่อหลังมี role ล้ม ค่าเริ่มต้นทีมจะหยุด

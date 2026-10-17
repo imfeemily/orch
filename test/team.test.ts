@@ -154,6 +154,32 @@ describe("runRoles: readiness gate", () => {
   });
 });
 
+describe("runRoles: readiness is rechecked before each role", () => {
+  it("skips a role whose agent stopped being ready after the plan was made, instead of failing the team", async () => {
+    let calls = 0;
+    const flipping: ReadinessChecker = async () => (++calls <= 1 ? { ready: true, reasons: [] } : { ready: false, reasons: ["cooling down"] });
+    const s = setup({}, { readiness: flipping });
+    const r = await go(s, { roles: ["developer", "pic"] });
+    expect(r.status).toBe("ok");
+    expect(r.roles!.map((x) => [x.role, x.status])).toEqual([["developer", "ok"], ["pic", "skipped"]]);
+    expect(r.roles![1].reason).toContain("cooling down");
+    expect(s.calls.map((c) => c.role)).toEqual(["developer"]);
+  });
+});
+
+describe("runRoles: role-only flags need a selector", () => {
+  it("rejects --dry-run, --require-codex and --keep-going without --role, --roles or --team, naming the flag", async () => {
+    const s = setup({});
+    for (const [extra, flag] of [[{ dryRun: true }, "--dry-run"], [{ requireCodex: true }, "--require-codex"], [{ keepGoing: true }, "--keep-going"]] as const) {
+      const r = await go(s, {}, extra);
+      expect(r.status).toBe("rejected");
+      expect(r.message).toContain(flag);
+      expect(r.message).toContain("--role");
+    }
+    expect(s.calls).toHaveLength(0);
+  });
+});
+
 describe("runRoles: dry run and rejections", () => {
   it("returns the plan without running or writing anything", async () => {
     const s = setup({}, { readiness: NOT_READY });

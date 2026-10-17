@@ -71,6 +71,11 @@ function writeArtifact(cwd: string, runId: string, role: string, output: string)
  */
 export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskResult> {
   const { config } = deps;
+  const noSelector = req.role === undefined && req.roles === undefined && req.team === undefined;
+  if (noSelector) {
+    const flags = [req.dryRun && "--dry-run", req.requireCodex && "--require-codex", req.keepGoing && "--keep-going"].filter(Boolean);
+    if (flags.length > 0) return rejected(`${flags.join(", ")} need --role, --roles or --team`);
+  }
   const planned = planRoles(config, req);
   if ("error" in planned) return rejected(planned.error);
   const names = planned.names;
@@ -148,13 +153,18 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
       results.push({ role: step.role, agent: step.agent, status: "not-run", reason: "an earlier role failed" });
       continue;
     }
+    const role = config.roles[step.role];
+    if (!step.skipReason && role.needs.length > 0 && step.agent) {
+      // An earlier role may have hit a rate limit since the plan was made: check again, do not fail.
+      const now = await deps.readiness(step.agent, role.needs);
+      if (!now.ready) step.skipReason = now.reasons.join("; ");
+    }
     if (step.skipReason) {
       results.push({ role: step.role, agent: step.agent, status: "skipped", reason: step.skipReason });
       messages.push(`role "${step.role}" skipped: ${step.skipReason}`);
       continue;
     }
 
-    const role = config.roles[step.role];
     const prompt = buildRolePrompt(role, req.task, capHandoffs(handoffs, config.pipeline.handoffChars), true);
     const r = await runTask(deps, {
       prompt,
