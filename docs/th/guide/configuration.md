@@ -113,9 +113,11 @@ teams:
   docs: [developer, reviewer]
 pipeline:
   handoffChars: 4000
+  parallel: true       # role อ่านอย่างเดียวที่อยู่ติดกันรันพร้อมกัน
+  maxParallel: 2
 ```
 
-คีย์ของ role: `prompt`, `agent`, `model`, `effort`, `context`, `needs`, `writes`, `agentArgs` คีย์ของ pipeline: `handoffChars`
+คีย์ของ role: `prompt`, `agent`, `model`, `effort`, `context`, `needs`, `writes`, `agentArgs` คีย์ของ pipeline: `handoffChars`, `parallel`, `maxParallel`
 
 - `roles.<name>.prompt`: คำสั่งที่กำหนด role (จำเป็นสำหรับ role ใหม่)
 - `roles.<name>.agent`, `model`, `effort`, `context`: role รันที่ไหนและอย่างไร เป็นของ role เอง rule ใน `rules` ไม่มีผลกับมัน
@@ -124,6 +126,8 @@ pipeline:
 - `roles.<name>.agentArgs`: อาร์กิวเมนต์เพิ่มเติมต่อเอเจนต์ ใส่ก่อน prompt role ที่เขียนไฟล์ต้องใส่ flag สิทธิ์ของเอเจนต์ที่นี่
 - `teams.<name>`: รายการชื่อ role ทีมรันตามลำดับ architecture, designer, developer, tester, reviewer, security (role นอกรายการนี้ตามหลังตามลำดับที่เขียน)
 - `pipeline.handoffChars`: จำนวนตัวอักษรสูงสุดของ handoff จาก role ก่อนหน้าที่ส่งให้ role (ค่าเริ่มต้น 4000)
+- `pipeline.parallel`: ให้ role อ่านอย่างเดียวที่อยู่ติดกันรันพร้อมกัน (ค่าเริ่มต้น `true`) ตั้ง `false` เพื่อรันทีละตัว
+- `pipeline.maxParallel`: จำนวน role สูงสุดที่รันพร้อมกัน (ค่าเริ่มต้น 2 จำนวนเต็มตั้งแต่ 1 ขึ้นไป)
 
 การตรวจตอนโหลดจะระบุคีย์ที่ผิด: `agent` หรือ `context` ที่ไม่รู้จัก, ความสามารถใน `needs` ที่ไม่มี, role แบบ `image` ที่ตรึงไว้กับ Claude, ทีมที่อ้างถึง role ที่ไม่มี หรือ `handoffChars` ที่ไม่ใช่จำนวนเต็มบวก
 

@@ -111,9 +111,11 @@ teams:
   docs: [developer, reviewer]
 pipeline:
   handoffChars: 4000
+  parallel: true       # adjacent read-only roles run together
+  maxParallel: 2
 ```
 
-Role keys: `prompt`, `agent`, `model`, `effort`, `context`, `needs`, `writes`, `agentArgs`. Pipeline key: `handoffChars`.
+Role keys: `prompt`, `agent`, `model`, `effort`, `context`, `needs`, `writes`, `agentArgs`. Pipeline keys: `handoffChars`, `parallel`, `maxParallel`.
 
 - `roles.<name>.prompt`: the instructions that define the role (required for a new role).
 - `roles.<name>.agent`, `model`, `effort`, `context`: where and how the role runs. They are the role's own; the rules under `rules` do not apply to it.
@@ -122,6 +124,8 @@ Role keys: `prompt`, `agent`, `model`, `effort`, `context`, `needs`, `writes`, `
 - `roles.<name>.agentArgs`: extra command-line arguments per agent, added before the prompt. Roles that write need the agent's permission flags here.
 - `teams.<name>`: a list of role names. Teams run in the order architecture, designer, developer, tester, reviewer, security (roles not in that list follow in the order written).
 - `pipeline.handoffChars`: the most characters of earlier roles' handoffs given to a role (default 4000).
+- `pipeline.parallel`: run adjacent read-only roles at the same time (default `true`). Set `false` for one role at a time.
+- `pipeline.maxParallel`: the most roles that run together (default 2, an integer of at least 1).
 
 Validation at load names the key: unknown `agent` or `context`, unknown capability in `needs`, an `image` role pinned to Claude, a team naming an unknown role, or a `handoffChars` that is not a positive integer.
 

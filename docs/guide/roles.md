@@ -5,7 +5,7 @@ A **role** is a specialised run of an agent: a developer implements, a tester wr
 Roles are opt-in. `orch run "..."` without a role flag behaves exactly as before.
 
 ::: info In this release
-Six built-in roles: `architecture`, `designer`, `developer`, `tester`, `reviewer`, `security`. Teams: `quick` (`developer`), `standard` (`developer`, `tester`, `reviewer`) and `full` (all six). Automatic role selection (`--auto`) and image roles on Codex are included. Running read-only roles in parallel is planned. You can define your own roles and teams in the config.
+Six built-in roles: `architecture`, `designer`, `developer`, `tester`, `reviewer`, `security`. Teams: `quick` (`developer`), `standard` (`developer`, `tester`, `reviewer`) and `full` (all six). Automatic role selection (`--auto`) and image roles on Codex are included. Adjacent read-only roles run in parallel (see below). You can define your own roles and teams in the config.
 :::
 
 ## Ways to run
@@ -45,6 +45,16 @@ Each role is one ordinary orch run, so routing, rate-limit failover, context pre
 `.orch/runs/` gets its own `.gitignore` containing `*`, so artifacts stay out of git without touching your `.gitignore`. If the files cannot be written, the run continues without them.
 
 Roles that edit files run one at a time. If a role fails (after failover), the team stops and the remaining roles are reported as `not-run`; add `--keep-going` to continue anyway.
+
+## Parallel read-only roles
+
+Roles that do not change your files (`writes: false`: `architecture`, `designer`, `reviewer`, `security`) run **at the same time** when they are next to each other in the plan, so the built-in `reviewer` and `security` finish together instead of one after the other. A role that edits files (`developer`, `tester`) always runs alone, and nothing runs alongside it.
+
+- Parallel saves **time, not tokens**: every role is still one call, so the cost is the same.
+- Roles in a batch all start from the same earlier handoffs and never see each other's. Results, artifacts and the printed answer stay in plan order, whichever call finishes first.
+- If one role in a batch fails, its sibling still finishes and is recorded; the team then stops (add `--keep-going` to continue). Cancelling cancels the rest.
+- At most `pipeline.maxParallel` roles (default 2) run together, because simultaneous calls use up a rate limit faster. Set `pipeline.parallel: false` or pass `--sequential` to run one role at a time.
+- `--dry-run` marks the roles that would run together, for example `reviewer ... (parallel with security)`.
 
 ## Roles that need Codex
 

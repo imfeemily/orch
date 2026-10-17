@@ -38,6 +38,7 @@ orch explain "fix the typo in README"                         # which roles --au
 - `--dry-run` prints the roles, their agents and the number of model calls without running anything.
 - `--require-codex` stops before anything runs when a role needs Codex and Codex is not ready; without it that role is skipped.
 - `--keep-going` continues with the remaining roles after one fails; by default the team stops.
+- `--sequential` runs one role at a time. By default adjacent read-only roles (such as `reviewer` and `security`) run in parallel, which saves time but not tokens.
 
 See [Roles](/guide/roles) for what each role does, handoffs and artifacts.
 

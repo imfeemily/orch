@@ -5,7 +5,7 @@
 role เป็น opt-in `orch run "..."` ที่ไม่มี flag ของ role ทำงานเหมือนเดิมทุกอย่าง
 
 ::: info ในเวอร์ชันนี้
-role ในตัวหกตัว: `architecture`, `designer`, `developer`, `tester`, `reviewer`, `security` ทีม: `quick` (`developer`), `standard` (`developer`, `tester`, `reviewer`) และ `full` (ครบทั้งหก) มีการเลือก role อัตโนมัติ (`--auto`) และ role สร้างภาพบน Codex แล้ว การรัน role อ่านอย่างเดียวขนานกันอยู่ในแผน และคุณกำหนด role กับทีมของตัวเองใน config ได้
+role ในตัวหกตัว: `architecture`, `designer`, `developer`, `tester`, `reviewer`, `security` ทีม: `quick` (`developer`), `standard` (`developer`, `tester`, `reviewer`) และ `full` (ครบทั้งหก) มีการเลือก role อัตโนมัติ (`--auto`) และ role สร้างภาพบน Codex แล้ว role อ่านอย่างเดียวที่อยู่ติดกันรันขนานกันได้ (ดูด้านล่าง) และคุณกำหนด role กับทีมของตัวเองใน config ได้
 :::
 
 ## วิธีรัน
@@ -45,6 +45,16 @@ orch run --team standard --dry-run "add a test for clamp()"   # แสดงแ�
 `.orch/runs/` มี `.gitignore` ของตัวเองที่เขียนว่า `*` ไฟล์เหล่านี้จึงไม่เข้า git โดยไม่แตะ `.gitignore` ของคุณ ถ้าเขียนไฟล์ไม่ได้ งานยังรันต่อไปโดยไม่มีไฟล์เหล่านั้น
 
 role ที่แก้ไฟล์ได้รันทีละตัว ถ้า role หนึ่งล้ม (หลัง failover แล้ว) ทีมจะหยุดและ role ที่เหลือถูกรายงานเป็น `not-run` ใส่ `--keep-going` เพื่อรันต่อ
+
+## role อ่านอย่างเดียวรันขนานกัน
+
+role ที่ไม่แก้ไฟล์ของคุณ (`writes: false`: `architecture`, `designer`, `reviewer`, `security`) จะรัน **พร้อมกัน** เมื่ออยู่ติดกันในแผน ดังนั้น `reviewer` และ `security` ในตัวจะเสร็จพร้อมกันแทนที่จะรอกันทีละตัว ส่วน role ที่แก้ไฟล์ (`developer`, `tester`) รันตัวเดียวเสมอ และไม่มีอะไรรันคู่กับมัน
+
+- การรันขนานประหยัด **เวลา ไม่ใช่โทเค่น** แต่ละ role ยังเป็นการเรียกหนึ่งครั้ง ต้นทุนจึงเท่าเดิม
+- role ในชุดเดียวกันเริ่มจาก handoff ก่อนหน้าชุดเดียวกัน และไม่เห็นของกันและกัน ผลลัพธ์ artifact และคำตอบที่พิมพ์ยังเรียงตามแผน ไม่ว่าการเรียกไหนจะเสร็จก่อน
+- ถ้า role หนึ่งในชุดล้ม role ข้างเคียงยังทำจนเสร็จและถูกบันทึก แล้วทีมจะหยุด (ใส่ `--keep-going` เพื่อรันต่อ) การยกเลิกจะยกเลิกส่วนที่เหลือ
+- รันพร้อมกันไม่เกิน `pipeline.maxParallel` role (ค่าเริ่มต้น 2) เพราะการเรียกพร้อมกันใช้ rate limit เร็วขึ้น ตั้ง `pipeline.parallel: false` หรือใส่ `--sequential` เพื่อรันทีละตัว
+- `--dry-run` ทำเครื่องหมาย role ที่จะรันพร้อมกัน เช่น `reviewer ... (parallel with security)`
 
 ## role ที่ต้องใช้ Codex
 

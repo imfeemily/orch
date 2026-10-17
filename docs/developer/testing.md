@@ -19,6 +19,7 @@ Run everything with `npm test` (Vitest). Automated tests **never call the real `
 | Spawning | `runner.test.ts` with `test/helpers/fake-agent.mjs` |
 | Handoff | `handoff.test.ts` |
 | Output parsing, ledger, usage report | `output.test.ts`, `usage.test.ts`, `orchestrator-output.test.ts`, `usage-report.test.ts`, `render.test.ts` |
+| Parallel roles: `groupSteps`, overlap, order, failure and abort in a batch | `team.test.ts` |
 | Auto selection | `select-roles.test.ts`, plus `runAuto` in `team.test.ts` and auto dispatch in `daemon.test.ts` |
 | Roles: planning, readiness, routing, team runner, report | `roles.test.ts`, `readiness.test.ts`, `orchestrator-role.test.ts`, `team.test.ts`, `plan-report.test.ts` |
 | State | `state.test.ts` |
