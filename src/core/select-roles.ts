@@ -49,7 +49,7 @@ function hasWord(text: string, word: string): boolean {
   if (/e$/i.test(word)) forms.push(`${last.slice(0, -1)}ing`);
   if (/y$/i.test(word)) forms.push(`${last.slice(0, -1)}ies`);
   const pattern = [...head, `(?:${forms.join("|")})`].join("\\s+");
-  return new RegExp(`\\b${pattern}\\b`, "i").test(text);
+  return new RegExp(`(?<![\\p{L}\\p{N}_])${pattern}(?![\\p{L}\\p{N}_])`, "iu").test(text);
 }
 
 /** Picks roles from the prompt with plain keyword rules; never calls a model. */

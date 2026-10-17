@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -156,7 +156,7 @@ describe("runRoles: team", () => {
   });
 });
 
-const assetsOf = (prompt: string) => /(\.orch\/runs\/[a-z0-9-]+\/assets)/.exec(prompt)?.[1];
+const assetsOf = (prompt: string) => /(\.orch\/runs\/[a-z0-9-]+\/assets\/[a-z0-9_-]+)/i.exec(prompt)?.[1];
 
 describe("runRoles: image roles and assets", () => {
   const writeImage = (role: string, prompt: string, cwd: string) => {
@@ -169,10 +169,51 @@ describe("runRoles: image roles and assets", () => {
     const r = await go(s, { roles: ["developer", "pic"] });
     const pic = s.calls.find((c) => c.role === "pic")!;
     expect(pic.prompt).toContain("## Assets directory");
-    expect(assetsOf(pic.prompt)).toMatch(/^\.orch\/runs\/[a-z0-9-]+\/assets$/);
+    expect(assetsOf(pic.prompt)).toMatch(/^\.orch\/runs\/[a-z0-9-]+\/assets\/pic$/);
     expect(r.roles![1].assets!.map((p) => p.split("/").pop())).toEqual(["mockup.png"]);
     expect(s.calls.find((c) => c.role === "developer")!.prompt).not.toContain("## Assets directory");
     expect(r.roles![0].assets).toBeUndefined();
+  });
+
+  it("gives each image role its own folder, so a role is never credited with another's files", async () => {
+    const s = setup({}, {
+      tweak: (c) => { c.roles.pic2 = { prompt: "You are the second picture maker.", needs: ["image"], writes: false }; },
+      onRun: (role, prompt, cwd) => {
+        const rel = assetsOf(prompt);
+        if (rel && (role === "pic" || role === "pic2")) writeFileSync(join(cwd, rel, `${role}.png`), "x");
+      },
+    });
+    const r = await go(s, { roles: ["pic", "pic2"] });
+    const files = (role: string) => r.roles!.find((x) => x.role === role)!.assets!.map((p) => p.split("/").pop());
+    expect(files("pic")).toEqual(["pic.png"]);
+    expect(files("pic2")).toEqual(["pic2.png"]);
+  });
+
+  it("lists only real files: a dangling symlink or a link to an outside file neither hides nor adds assets", async () => {
+    const s = setup({}, {
+      onRun: (role, prompt, cwd) => {
+        const rel = assetsOf(prompt);
+        if (role !== "pic" || !rel) return;
+        writeFileSync(join(cwd, rel, "real.png"), "x");
+        symlinkSync("/nonexistent/target", join(cwd, rel, "dangling.png"));
+        symlinkSync(join(cwd, "..", "outside.txt"), join(cwd, rel, "outside.png"));
+      },
+    });
+    writeFileSync(join(s.cwd, "..", "outside.txt"), "secret");
+    const r = await go(s, { roles: ["pic"] });
+    expect(r.roles![0].assets!.map((p) => p.split("/").pop())).toEqual(["real.png"]);
+  });
+
+  it("skips an image role whose own flags (or the agent's base flags) disable image generation", async () => {
+    const s = setup({}, {
+      tweak: (c) => { c.roles.pic.agentArgs = { codex: ["-c", "features.image_generation=false"] }; },
+    });
+    const r = await go(s, { roles: ["developer", "pic"] });
+    expect(r.roles![1]).toMatchObject({ role: "pic", status: "skipped" });
+    expect(r.roles![1].reason).toContain("disables image generation");
+    const s2 = setup({}, { tweak: (c) => { c.agents.codex.args = ["exec", "--disable", "image_generation", "--", "{prompt}"]; } });
+    const r2 = await go(s2, { roles: ["pic"] }, { dryRun: true });
+    expect(r2.plan![0].skipReason).toContain("disables image generation");
   });
 
   it("reports an empty list when the role left no files, and never invents files from its text", async () => {

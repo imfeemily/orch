@@ -33,13 +33,24 @@ export const spawnRunner: CommandRunner = (command, args) =>
     child.on("close", (code) => finish(code));
   });
 
-/** Why a context preset's flags stop a role from using a capability, if they do. */
-export function contextBlocks(args: string[] | undefined, needs: Capability[]): string | undefined {
+/** Why a list of agent flags stops a role from using a capability, if it does. The last flag wins. */
+export function contextBlocks(args: string[] | undefined, needs: Capability[], label = "context preset"): string | undefined {
   if (!args || !needs.includes("image")) return undefined;
-  for (let i = 0; i < args.length - 1; i++) {
-    if (args[i] === "--disable" && args[i + 1] === "image_generation") return "context preset disables image generation";
+  let off = false;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    const next = args[i + 1];
+    const flag = /^(--disable|--enable|-c|--config)(?:=(.*))?$/.exec(a);
+    if (!flag) continue;
+    const value = flag[2] ?? next;
+    if (flag[2] === undefined) i++;
+    if (flag[1] === "--disable" && value === "image_generation") off = true;
+    else if (flag[1] === "--enable" && value === "image_generation") off = false;
+    else if ((flag[1] === "-c" || flag[1] === "--config") && /^features\.image_generation=(true|false)$/.test(value ?? "")) {
+      off = value === "features.image_generation=false";
+    }
   }
-  return undefined;
+  return off ? `${label} disables image generation` : undefined;
 }
 
 const LOGIN_HINT: Record<AgentName, string> = {
