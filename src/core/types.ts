@@ -130,6 +130,8 @@ export interface TaskResult {
   output: string;
   failedOver: boolean;
   attempts: Attempt[];
+  /** what automatic selection chose and why */
+  selection?: { roles: string[]; reasons: string[]; dropped: string[] };
   /** files a single image role left in its assets directory */
   assets?: string[];
   /** per-role outcomes of a team run */

@@ -12,7 +12,9 @@ export type Command =
       dryRun?: boolean;
       requireCodex?: boolean;
       keepGoing?: boolean;
+      auto?: boolean;
     }
+  | { name: "explain"; prompt: string }
   | { name: "status" }
   | { name: "init" }
   | { name: "usage"; since: string; by: "agent" | "model" | "context" | "role" }
@@ -30,6 +32,7 @@ export function parseArgs(argv: string[]): Command {
     let dryRun = false;
     let requireCodex = false;
     let keepGoing = false;
+    let auto: boolean | undefined;
     const words: string[] = [];
     for (let i = 0; i < rest.length; i++) {
       if (rest[i] === "--cwd") {
@@ -57,6 +60,16 @@ export function parseArgs(argv: string[]): Command {
         if (!team) throw new Error("--team requires a team name");
         continue;
       }
+      if (rest[i] === "--auto") {
+        if (auto === false) throw new Error("choose only one of --auto and --no-auto");
+        auto = true;
+        continue;
+      }
+      if (rest[i] === "--no-auto") {
+        if (auto === true) throw new Error("choose only one of --auto and --no-auto");
+        auto = false;
+        continue;
+      }
       if (rest[i] === "--dry-run") { dryRun = true; continue; }
       if (rest[i] === "--require-codex") { requireCodex = true; continue; }
       if (rest[i] === "--keep-going") { keepGoing = true; continue; }
@@ -66,10 +79,17 @@ export function parseArgs(argv: string[]): Command {
     if (!prompt) throw new Error("usage: orch run [--cwd DIR] <prompt>");
     const chosen = [role !== undefined && "--role", roles !== undefined && "--roles", team !== undefined && "--team"].filter(Boolean);
     if (chosen.length > 1) throw new Error(`choose only one of ${chosen.join(" and ")}`);
+    if (auto === true && chosen.length > 0) throw new Error(`choose only one of --auto and ${chosen.join(" and ")}`);
     return {
       name: "run", prompt, cwd, context, role, roles, team,
       ...(dryRun ? { dryRun } : {}), ...(requireCodex ? { requireCodex } : {}), ...(keepGoing ? { keepGoing } : {}),
+      ...(auto !== undefined ? { auto } : {}),
     };
+  }
+  if (cmd === "explain") {
+    const prompt = rest.join(" ").trim();
+    if (!prompt) throw new Error("usage: orch explain <prompt>");
+    return { name: "explain", prompt };
   }
   if (cmd === "usage") {
     let since = "24h";

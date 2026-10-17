@@ -5,6 +5,7 @@ import { type Deps, runTask } from "./orchestrator.js";
 import { type ReadinessChecker, contextBlocks } from "./readiness.js";
 import { type Handoff, type RoleSelection, buildRolePrompt, capHandoffs, extractHandoff, planRoles } from "./roles.js";
 import { pickRoleRoute } from "./router.js";
+import { selectRoles } from "./select-roles.js";
 import type { AgentName, PlanStep, RoleResult, TaskResult, Usage } from "./types.js";
 
 export interface TeamDeps extends Deps {
@@ -21,6 +22,7 @@ export interface TeamRequest extends RoleSelection {
   dryRun?: boolean;
   requireCodex?: boolean;
   keepGoing?: boolean;
+  auto?: boolean;
 }
 
 /** Files (not directories, not dotfiles) an image role left in its assets directory. */
@@ -243,4 +245,43 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
     usage: sumUsage(results.map((x) => x.usage)),
     ...(messages.length ? { message: messages.join(" | ") } : {}),
   };
+}
+
+/**
+ * Automatic mode: pick roles from the prompt with `selectRoles`, run them as a team, and attach the
+ * selection. A prompt that selects no roles (a question) runs as one plain call.
+ */
+export async function runAuto(deps: TeamDeps, req: TeamRequest): Promise<TaskResult> {
+  const given = [req.role !== undefined && "--role", req.roles !== undefined && "--roles", req.team !== undefined && "--team"].filter(Boolean);
+  if (given.length > 0) return rejected(`--auto cannot be combined with ${given.join(" or ")}`);
+
+  const sel = selectRoles(deps.config, req.task);
+  const selection = { roles: sel.roles, reasons: sel.reasons, dropped: sel.dropped };
+
+  if (sel.roles.length === 0) {
+    if (req.dryRun) {
+      return {
+        status: "planned",
+        agent: null,
+        output: "",
+        failedOver: false,
+        attempts: [],
+        plan: [],
+        message: "1 model call planned (plain call, no roles)",
+        selection,
+      };
+    }
+    const plain = await runTask(deps, {
+      prompt: req.task,
+      cwd: req.cwd,
+      depth: req.depth,
+      context: req.context,
+      signal: req.signal,
+      onChunk: req.onChunk,
+    });
+    return { ...plain, selection };
+  }
+
+  const result = await runRoles(deps, { ...req, auto: undefined, roles: sel.roles });
+  return { ...result, selection };
 }

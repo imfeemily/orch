@@ -3,7 +3,7 @@ import net from "node:net";
 import { dirname, isAbsolute } from "node:path";
 import { type Deps, runTask } from "../core/orchestrator.js";
 import { type ReadinessChecker, createReadinessChecker } from "../core/readiness.js";
-import { runRoles } from "../core/team.js";
+import { runAuto, runRoles } from "../core/team.js";
 import { isAlive } from "./client.js";
 import type { Message, Request } from "./protocol.js";
 
@@ -56,13 +56,15 @@ export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promi
         send({ type: "error", message: `cwd must be an existing absolute directory: ${req.cwd}` });
         return;
       }
-      const wantsRoles = req.role !== undefined || req.roles !== undefined || req.team !== undefined || req.dryRun === true || req.requireCodex === true || req.keepGoing === true;
+      const hasSelector = req.role !== undefined || req.roles !== undefined || req.team !== undefined;
+      const autoOn = req.auto === true || (req.auto !== false && deps.config.auto.enabled && !hasSelector);
+      const wantsRoles = hasSelector || req.dryRun === true || req.requireCodex === true || req.keepGoing === true;
       try {
-        if (wantsRoles) {
+        if (autoOn || wantsRoles) {
           const readiness =
             deps.readiness ??
             createReadinessChecker({ config: deps.config, isCooling: (a) => deps.state.isCooling(a, (deps.now ?? Date.now)()) });
-          const result = await runRoles(
+          const result = await (autoOn ? runAuto : runRoles)(
             { ...deps, readiness },
             {
               task: req.prompt,
@@ -75,6 +77,7 @@ export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promi
               dryRun: req.dryRun === true,
               requireCodex: req.requireCodex === true,
               keepGoing: req.keepGoing === true,
+              auto: req.auto === true,
               signal,
               onChunk: (text) => send({ type: "chunk", text }),
             },

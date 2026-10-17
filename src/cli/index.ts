@@ -5,7 +5,9 @@ import { connectOrStart, isAlive, sendRequest } from "../daemon/client.js";
 import { parseArgs } from "./args.js";
 import { Ledger, billableTokens, parseDuration, summarize } from "../core/usage.js";
 import { finalOutputToPrint } from "./render.js";
-import { formatPlan, formatRoles } from "./plan-report.js";
+import { loadConfig } from "../core/config.js";
+import { selectRoles } from "../core/select-roles.js";
+import { formatAssets, formatPlan, formatRoles, formatSelection } from "./plan-report.js";
 import { formatUsage } from "./usage-report.js";
 import { USAGE } from "./usage.js";
 
@@ -22,6 +24,11 @@ async function main(): Promise<number> {
       const ledger = new Ledger(join(orchHome(), "usage.jsonl"));
       const entries = ledger.readSince(Date.now() - parseDuration(cmd.since)!);
       console.log(formatUsage(summarize(entries, cmd.by), cmd.since));
+      return 0;
+    }
+
+    case "explain": {
+      console.log(formatSelection(selectRoles(loadConfig(), cmd.prompt)));
       return 0;
     }
 
@@ -84,6 +91,7 @@ async function main(): Promise<number> {
           dryRun: cmd.dryRun,
           requireCodex: cmd.requireCodex,
           keepGoing: cmd.keepGoing,
+          auto: cmd.auto,
         },
         (m) => {
           if (m.type === "chunk") process.stdout.write(m.text);
@@ -93,12 +101,16 @@ async function main(): Promise<number> {
       if (final.type !== "result") throw new Error("unexpected reply from daemon");
       const r = final.result;
       if (r.status === "planned") {
+        if (r.selection) console.log(formatSelection(r.selection));
         console.log(formatPlan(r));
         return 0;
       }
       process.stdout.write(finalOutputToPrint(r.streamed === true, r.output));
+      if (r.selection) console.error(formatSelection(r.selection));
       const roleReport = formatRoles(r);
       if (roleReport) console.error(roleReport);
+      const assetReport = formatAssets(r);
+      if (assetReport) console.error(assetReport);
       if (r.failedOver) console.error(`\norch: switched agent, finished with ${r.agent}`);
       if (r.status !== "ok") {
         console.error(`orch: ${r.status}${r.message ? `: ${r.message}` : ""}`);

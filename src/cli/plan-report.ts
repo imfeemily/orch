@@ -17,3 +17,20 @@ export function formatRoles(result: TaskResult): string {
   const lines = roles.map((r) => `  ${r.role} ${r.status}${r.reason ? `: ${r.reason}` : ""}`);
   return ["roles:", ...lines].join("\n");
 }
+
+/** What automatic selection chose, with the reasons. */
+export function formatSelection(sel: { roles: string[]; reasons: string[]; dropped: string[] }): string {
+  const head = sel.roles.length > 0 ? `auto: roles ${sel.roles.join(", ")}` : "auto: no roles";
+  return [head, ...sel.reasons.map((r) => `  ${r}`)].join("\n");
+}
+
+/** Image and diagram files that roles left in their assets directories. */
+export function formatAssets(result: TaskResult): string {
+  const lines: string[] = [];
+  for (const r of result.roles ?? []) {
+    if (r.assets === undefined) continue;
+    lines.push(`  ${r.role}: ${r.assets.length > 0 ? r.assets.join(", ") : "no files"}`);
+  }
+  if (result.assets && result.assets.length > 0) lines.push(`  ${result.assets.join(", ")}`);
+  return lines.length > 0 ? ["assets:", ...lines].join("\n") : "";
+}

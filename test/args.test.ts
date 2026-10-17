@@ -49,6 +49,18 @@ describe("parseArgs", () => {
     expect(parseArgs(["usage", "--by", "role"])).toEqual({ name: "usage", since: "24h", by: "role" });
   });
 
+  it("parses --auto, --no-auto and explain", () => {
+    expect(parseArgs(["run", "--auto", "fix", "it"])).toMatchObject({ name: "run", prompt: "fix it", auto: true });
+    expect(parseArgs(["run", "--no-auto", "fix", "it"])).toMatchObject({ auto: false });
+    expect(parseArgs(["explain", "fix", "the", "login"])).toEqual({ name: "explain", prompt: "fix the login" });
+    expect(() => parseArgs(["explain"])).toThrow(/explain/);
+  });
+
+  it("rejects --auto with a selector or with --no-auto, naming both flags", () => {
+    expect(() => parseArgs(["run", "--auto", "--team", "standard", "x"])).toThrow(/--auto.*--team/);
+    expect(() => parseArgs(["run", "--auto", "--no-auto", "x"])).toThrow(/--auto.*--no-auto/);
+  });
+
   it("parses --context for run", () => {
     expect(parseArgs(["run", "--context", "lean", "fix", "it"])).toEqual({
       name: "run", prompt: "fix it", cwd: undefined, context: "lean",

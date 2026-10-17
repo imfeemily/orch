@@ -64,6 +64,13 @@ describe("mcp server", () => {
     })) as { content: Array<{ text: string }>; isError?: boolean };
     expect(team.isError).toBeFalsy();
     expect(team.content[0].text).toContain("roles=developer:ok");
+
+    const auto = (await client.callTool({
+      name: "orch_run",
+      arguments: { prompt: "fix the typo", cwd: home, auto: true },
+    })) as { content: Array<{ text: string }>; isError?: boolean };
+    expect(auto.isError).toBeFalsy();
+    expect(auto.content[0].text).toContain("auto=developer,tester");
     expect(res.content[0].text).not.toContain("input_tokens");
   }, 20_000);
 });

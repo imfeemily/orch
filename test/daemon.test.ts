@@ -14,11 +14,12 @@ afterEach(async () => {
   while (closers.length) await closers.pop()!();
 });
 
-function setup(run: RunFn) {
+function setup(run: RunFn, auto?: boolean) {
   // keep the path short: unix socket paths are limited to ~104 chars on macOS
   const dir = mkdtempSync(join(tmpdir(), "orch-"));
   const sockPath = join(dir, "sock");
   const config = { ...DEFAULT_CONFIG, agents: { ...DEFAULT_CONFIG.agents, claude: { ...DEFAULT_CONFIG.agents.claude, output: "text" as const } } };
+  if (auto) config.auto = { enabled: true, maxRoles: 3 };
   const deps = { config, state: new StateStore(join(dir, "state.json")), run };
   return { dir, sockPath, deps };
 }
@@ -82,6 +83,46 @@ describe("daemon", () => {
     const alone = await sendRequest(s.sockPath, { type: "run", prompt: "x", cwd: s.dir, depth: 0, requireCodex: true }, () => {});
     expect(alone.type === "result" && alone.result.status).toBe("rejected");
     expect(seen).toHaveLength(0);
+  });
+
+  it("selects roles automatically when auto.enabled or auto is requested, and stays plain otherwise", async () => {
+    const seen: string[] = [];
+    const run: RunFn = async (_c, _a, prompt) => {
+      seen.push(prompt);
+      return { exitCode: 0, stdout: "ok", stderr: "" };
+    };
+    const on = setup(run, true);
+    closers.push((await startDaemon({ sockPath: on.sockPath, deps: on.deps })).close);
+    const change = await sendRequest(on.sockPath, { type: "run", prompt: "fix the typo", cwd: on.dir, depth: 0 }, () => {});
+    expect(change.type === "result" && change.result.selection?.roles).toEqual(["developer", "tester"]);
+    expect(seen).toHaveLength(2);
+
+    seen.length = 0;
+    await sendRequest(on.sockPath, { type: "run", prompt: "explain the router", cwd: on.dir, depth: 0 }, () => {});
+    expect(seen).toEqual(["explain the router"]);
+
+    seen.length = 0;
+    await sendRequest(on.sockPath, { type: "run", prompt: "fix the typo", cwd: on.dir, depth: 0, auto: false }, () => {});
+    expect(seen).toEqual(["fix the typo"]);
+
+    seen.length = 0;
+    await sendRequest(on.sockPath, { type: "run", prompt: "fix the typo", cwd: on.dir, depth: 0, team: "quick" }, () => {});
+    expect(seen).toHaveLength(1); // an explicit team beats auto.enabled
+    expect(seen[0]).toContain(DEFAULT_CONFIG.roles.developer.prompt);
+  });
+
+  it("rejects auto together with an explicit selector, and plain runs do not use auto when disabled", async () => {
+    const seen: string[] = [];
+    const run: RunFn = async (_c, _a, prompt) => {
+      seen.push(prompt);
+      return { exitCode: 0, stdout: "ok", stderr: "" };
+    };
+    const off = setup(run);
+    closers.push((await startDaemon({ sockPath: off.sockPath, deps: off.deps })).close);
+    const bad = await sendRequest(off.sockPath, { type: "run", prompt: "x", cwd: off.dir, depth: 0, auto: true, team: "quick" }, () => {});
+    expect(bad.type === "result" && bad.result.status).toBe("rejected");
+    await sendRequest(off.sockPath, { type: "run", prompt: "fix the typo", cwd: off.dir, depth: 0 }, () => {});
+    expect(seen).toEqual(["fix the typo"]);
   });
 
   it("answers status", async () => {

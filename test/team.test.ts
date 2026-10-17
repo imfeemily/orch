@@ -6,7 +6,7 @@ import { StateStore } from "../src/core/state.js";
 import type { Config, RunFn, RunResult } from "../src/core/types.js";
 import { Ledger } from "../src/core/usage.js";
 import type { ReadinessChecker } from "../src/core/readiness.js";
-import { runRoles } from "../src/core/team.js";
+import { runAuto, runRoles } from "../src/core/team.js";
 import { noSummaryConfig } from "./helpers/config.js";
 
 const ok = (stdout: string): RunResult => ({ exitCode: 0, stdout, stderr: "" });
@@ -175,6 +175,57 @@ describe("runRoles: image roles and assets", () => {
     expect(run.roles![1]).toMatchObject({ role: "pic", status: "skipped" });
     expect(run.roles![1].reason).toContain("disables image generation");
     expect(s.calls.map((c) => c.role)).toEqual(["developer"]);
+  });
+});
+
+describe("runAuto", () => {
+  const auto = (s: S, task: string, extra: object = {}) => runAuto(s.deps, { task, cwd: s.cwd, depth: 0, ...extra });
+
+  it("runs the selected roles like a team and reports the selection", async () => {
+    const s = setup({});
+    const r = await auto(s, "fix the typo in README");
+    expect(s.calls.map((c) => c.role)).toEqual(["developer", "tester"]);
+    expect(r.status).toBe("ok");
+    expect(r.selection!.roles).toEqual(["developer", "tester"]);
+    expect(r.selection!.reasons.join(" ")).toContain("fix");
+  });
+
+  it("runs a question as one plain call with no roles", async () => {
+    const s = setup({});
+    const r = await auto(s, "explain how the router picks an agent");
+    expect(s.calls).toHaveLength(1);
+    expect(s.calls[0].prompt).toBe("explain how the router picks an agent");
+    expect(r.selection!.roles).toEqual([]);
+    expect(existsSync(join(s.cwd, ".orch"))).toBe(false);
+  });
+
+  it("respects auto.maxRoles and reports the dropped roles", async () => {
+    const s = setup({}, { tweak: (c) => (c.auto.maxRoles = 1) });
+    const r = await auto(s, "fix the typo in README");
+    expect(s.calls.map((c) => c.role)).toEqual(["developer"]);
+    expect(r.selection!.dropped).toEqual(["tester"]);
+  });
+
+  it("plans without running on a dry run", async () => {
+    const s = setup({});
+    const r = await auto(s, "fix the typo in README", { dryRun: true });
+    expect(r.status).toBe("planned");
+    expect(r.plan!.map((p) => p.role)).toEqual(["developer", "tester"]);
+    expect(r.selection!.roles).toEqual(["developer", "tester"]);
+    expect(s.calls).toHaveLength(0);
+    const q = await auto(s, "what does clamp do", { dryRun: true });
+    expect(q.status).toBe("planned");
+    expect(q.message).toContain("plain");
+  });
+
+  it("rejects an explicit selector and allows role-only flags", async () => {
+    const s = setup({});
+    const bad = await auto(s, "fix it", { team: "standard" });
+    expect(bad.status).toBe("rejected");
+    expect(bad.message).toContain("--auto");
+    expect(bad.message).toContain("--team");
+    const ok2 = await auto(s, "fix the typo in README", { requireCodex: true, keepGoing: true });
+    expect(ok2.status).toBe("ok");
   });
 });
 

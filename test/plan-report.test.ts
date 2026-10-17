@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPlan, formatRoles } from "../src/cli/plan-report.js";
+import { formatAssets, formatPlan, formatRoles, formatSelection } from "../src/cli/plan-report.js";
 import type { TaskResult } from "../src/core/types.js";
 
 const base: TaskResult = { status: "planned", agent: null, output: "", failedOver: false, attempts: [] };
@@ -41,5 +41,46 @@ describe("formatRoles", () => {
 
   it("is empty when there are no roles", () => {
     expect(formatRoles(base)).toBe("");
+  });
+});
+
+describe("formatSelection", () => {
+  it("lists the roles and the reasons, and the dropped ones", () => {
+    const out = formatSelection({
+      roles: ["developer", "tester"],
+      reasons: ['developer: every change task', 'tester: matched "fix"', "not run because of the limit of 2 roles: reviewer"],
+      dropped: ["reviewer"],
+    });
+    expect(out).toContain("auto: roles developer, tester");
+    expect(out).toContain('tester: matched "fix"');
+    expect(out).toContain("reviewer");
+  });
+
+  it("says no roles for a question", () => {
+    const out = formatSelection({ roles: [], reasons: ["question or explanation"], dropped: [] });
+    expect(out).toContain("auto: no roles");
+    expect(out).toContain("question or explanation");
+  });
+});
+
+describe("formatAssets", () => {
+  it("lists files per role and says when a role left none", () => {
+    const out = formatAssets({
+      ...base,
+      status: "ok",
+      roles: [
+        { role: "developer", agent: "claude", status: "ok" },
+        { role: "designer", agent: "codex", status: "ok", assets: ["/p/.orch/runs/a/assets/mockup.png"] },
+        { role: "pic", agent: "codex", status: "ok", assets: [] },
+      ],
+    });
+    expect(out).toContain("designer: /p/.orch/runs/a/assets/mockup.png");
+    expect(out).toContain("pic: no files");
+    expect(out).not.toContain("developer");
+  });
+
+  it("handles a single role result and is empty when there are no assets", () => {
+    expect(formatAssets({ ...base, assets: ["/p/a.png"] })).toContain("/p/a.png");
+    expect(formatAssets(base)).toBe("");
   });
 });

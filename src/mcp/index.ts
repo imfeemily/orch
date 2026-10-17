@@ -5,7 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { orchHome } from "../core/config.js";
 import { billableTokens } from "../core/usage.js";
-import { formatPlan } from "../cli/plan-report.js";
+import { formatPlan, formatSelection } from "../cli/plan-report.js";
 import { connectOrStart, sendRequest } from "../daemon/client.js";
 
 const sock = join(orchHome(), "sock");
@@ -29,21 +29,24 @@ server.tool(
     dryRun: z.boolean().optional(),
     requireCodex: z.boolean().optional(),
     keepGoing: z.boolean().optional(),
+    auto: z.boolean().optional(),
   },
-  async ({ prompt, cwd, context, role, roles, team, dryRun, requireCodex, keepGoing }) => {
+  async ({ prompt, cwd, context, role, roles, team, dryRun, requireCodex, keepGoing, auto }) => {
     await connectOrStart(sock);
     const depth = Number(process.env.ORCH_DEPTH ?? 0) || 0;
     const final = await sendRequest(
       sock,
-      { type: "run", prompt, cwd: resolve(cwd ?? process.cwd()), depth, context, role, roles, team, dryRun, requireCodex, keepGoing },
+      { type: "run", prompt, cwd: resolve(cwd ?? process.cwd()), depth, context, role, roles, team, dryRun, requireCodex, keepGoing, auto },
       () => {},
     );
     if (final.type === "error") return text(final.message, true);
     if (final.type !== "result") return text("unexpected reply from daemon", true);
     const r = final.result;
-    if (r.status === "planned") return text(formatPlan(r));
+    if (r.status === "planned") return text(`${r.selection ? `${formatSelection(r.selection)}\n` : ""}${formatPlan(r)}`);
     const footer = `\n\n[orch] status=${r.status} agent=${r.agent ?? "-"} failedOver=${r.failedOver}${r.usage ? ` tokens=${billableTokens(r.usage)}` : ""}${
       r.roles ? ` roles=${r.roles.map((x) => `${x.role}:${x.status}`).join(",")}` : ""
+    }${r.selection ? ` auto=${r.selection.roles.join(",") || "none"}` : ""}${
+      [...(r.assets ?? []), ...(r.roles ?? []).flatMap((x) => x.assets ?? [])].length ? ` assets=${[...(r.assets ?? []), ...(r.roles ?? []).flatMap((x) => x.assets ?? [])].join(",")}` : ""
     }${
       r.message ? ` message=${r.message}` : ""
     }`;

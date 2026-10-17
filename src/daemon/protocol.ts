@@ -13,6 +13,7 @@ export type Request =
       dryRun?: boolean;
       requireCodex?: boolean;
       keepGoing?: boolean;
+      auto?: boolean;
     }
   | { type: "status" }
   | { type: "shutdown" };
