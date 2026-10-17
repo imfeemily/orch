@@ -21,6 +21,7 @@ rules:
 - `defaultAgent`: `claude` or `codex`. Used when no rule matches.
 - `agents`: settings per agent (`claude`, `codex`); see below.
 - `contexts`: named presets of extra flags that shrink the fixed context of each call; see [Context presets](#context-presets).
+- `auto`: automatic role selection; see [Automatic selection](#automatic-selection-auto).
 - `roles`, `teams`, `pipeline`: specialised runs and the named sets of them; see [Roles and teams](#roles-and-teams).
 - `rules`: ordered list; the first rule whose `match` fits the prompt wins.
 
@@ -123,6 +124,22 @@ Role keys: `prompt`, `agent`, `model`, `effort`, `context`, `needs`, `writes`, `
 - `pipeline.handoffChars`: the most characters of earlier roles' handoffs given to a role (default 4000).
 
 Validation at load names the key: unknown `agent` or `context`, unknown capability in `needs`, an `image` role pinned to Claude, a team naming an unknown role, or a `handoffChars` that is not a positive integer.
+
+### Automatic selection (`auto`)
+
+```yaml
+auto:
+  enabled: false        # true: pick roles for every run (see Roles)
+  maxRoles: 3           # the most roles auto selection will run
+  keywords:             # extra words per role, added to the built-in lists
+    security: [pii, gdpr]
+```
+
+Keys of `auto`: `enabled`, `maxRoles`, `keywords`.
+
+- `auto.enabled`: when true, a plain `orch run` selects roles from the prompt; `--no-auto` turns it off for one run. Default false.
+- `auto.maxRoles`: a positive integer, default 3.
+- `auto.keywords`: role name to extra words (lists of strings). Unknown role names are rejected at load.
 
 ## Environment variables
 

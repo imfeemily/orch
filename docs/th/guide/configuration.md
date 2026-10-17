@@ -22,6 +22,7 @@ rules:
 - `defaultAgent`: `claude` หรือ `codex` ใช้เมื่อไม่มี rule ตรง
 - `agents`: ค่าของแต่ละเอเจนต์ (`claude`, `codex`) ดูด้านล่าง
 - `contexts`: preset ที่รวม flag เพิ่มเติมเพื่อลด context คงที่ของแต่ละการเรียก ดู [Context presets](#context-presets)
+- `auto`: การเลือก role อัตโนมัติ ดู [การเลือกอัตโนมัติ](#การเลือกอัตโนมัติ-auto)
 - `roles`, `teams`, `pipeline`: การรันเฉพาะทาง และชุดของมันที่ตั้งชื่อไว้ ดู [Roles และทีม](#roles-และทีม)
 - `rules`: รายการเรียงลำดับ rule แรกที่ `match` ตรงกับ prompt จะถูกใช้
 
@@ -125,6 +126,22 @@ pipeline:
 - `pipeline.handoffChars`: จำนวนตัวอักษรสูงสุดของ handoff จาก role ก่อนหน้าที่ส่งให้ role (ค่าเริ่มต้น 4000)
 
 การตรวจตอนโหลดจะระบุคีย์ที่ผิด: `agent` หรือ `context` ที่ไม่รู้จัก, ความสามารถใน `needs` ที่ไม่มี, role แบบ `image` ที่ตรึงไว้กับ Claude, ทีมที่อ้างถึง role ที่ไม่มี หรือ `handoffChars` ที่ไม่ใช่จำนวนเต็มบวก
+
+### การเลือกอัตโนมัติ (`auto`)
+
+```yaml
+auto:
+  enabled: false        # true: เลือก role ให้ทุกการรัน (ดู Roles)
+  maxRoles: 3           # จำนวน role สูงสุดที่การเลือกอัตโนมัติจะรัน
+  keywords:             # คำเพิ่มเติมต่อ role เพิ่มเข้ากับรายการในตัว
+    security: [pii, gdpr]
+```
+
+คีย์ของ `auto`: `enabled`, `maxRoles`, `keywords`
+
+- `auto.enabled`: ถ้าเป็น true `orch run` ธรรมดาจะเลือก role จาก prompt ใช้ `--no-auto` เพื่อปิดในรันเดียว ค่าเริ่มต้น false
+- `auto.maxRoles`: จำนวนเต็มบวก ค่าเริ่มต้น 3
+- `auto.keywords`: ชื่อ role ไปยังคำเพิ่มเติม (รายการข้อความ) ชื่อ role ที่ไม่มีจะถูกปฏิเสธตอนโหลด
 
 ## ตัวแปรสภาพแวดล้อม
 

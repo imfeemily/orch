@@ -29,9 +29,12 @@ orch run --role reviewer "review the last commit"             # one role
 orch run --team standard "add a test for clamp()"             # a named team
 orch run --roles developer,tester "fix the bug in parser.ts"  # your own list, in order
 orch run --team standard --dry-run "add a test for clamp()"   # show the plan, spend nothing
+orch run --auto "fix the typo in README"                      # roles chosen for you (see Roles)
+orch explain "fix the typo in README"                         # which roles --auto would pick, and why
 ```
 
 - `--role`, `--roles` and `--team` cannot be combined. `--dry-run`, `--require-codex` and `--keep-going` only apply with one of them; without one orch rejects them instead of ignoring them.
+- `--auto` selects the roles from the prompt (no model call); `--no-auto` turns off `auto.enabled` for one run. `--auto` cannot be combined with `--role`, `--roles` or `--team`. `orch explain "<prompt>"` shows the selection without running.
 - `--dry-run` prints the roles, their agents and the number of model calls without running anything.
 - `--require-codex` stops before anything runs when a role needs Codex and Codex is not ready; without it that role is skipped.
 - `--keep-going` continues with the remaining roles after one fails; by default the team stops.
@@ -71,7 +74,7 @@ tool_timeout_sec = 1800   # Codex's default tool timeout is short; real tasks ta
 
 Tools:
 
-- `orch_run({ prompt, cwd?, context?, role?, roles?, team?, dryRun?, requireCodex?, keepGoing? })` runs a task and returns the agent's output followed by a `[orch] status=... agent=... failedOver=...` line. `cwd` defaults to the server's directory and must be an existing directory.
+- `orch_run({ prompt, cwd?, context?, role?, roles?, team?, auto?, dryRun?, requireCodex?, keepGoing? })` runs a task and returns the agent's output followed by a `[orch] status=... agent=... failedOver=...` line. `cwd` defaults to the server's directory and must be an existing directory.
 - `orch_status()` returns cooldowns and recent jobs as JSON.
 
 Cancelling a call stops the running agent.

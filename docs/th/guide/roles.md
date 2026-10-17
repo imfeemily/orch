@@ -5,7 +5,7 @@
 role เป็น opt-in `orch run "..."` ที่ไม่มี flag ของ role ทำงานเหมือนเดิมทุกอย่าง
 
 ::: info ในเวอร์ชันนี้
-role ในตัว: `developer`, `tester`, `reviewer` ทีม `quick` คือ `developer` ส่วนทีม `standard` คือ `developer`, `tester`, `reviewer` role architecture, designer, security, การเลือก role อัตโนมัติ และการรัน role อ่านอย่างเดียวขนานกัน อยู่ในแผน ส่วนการกำหนด role และทีมของคุณเองทำได้แล้วใน config
+role ในตัวหกตัว: `architecture`, `designer`, `developer`, `tester`, `reviewer`, `security` ทีม: `quick` (`developer`), `standard` (`developer`, `tester`, `reviewer`) และ `full` (ครบทั้งหก) มีการเลือก role อัตโนมัติ (`--auto`) และ role สร้างภาพบน Codex แล้ว การรัน role อ่านอย่างเดียวขนานกันอยู่ในแผน และคุณกำหนด role กับทีมของตัวเองใน config ได้
 :::
 
 ## วิธีรัน
@@ -30,6 +30,9 @@ orch run --team standard --dry-run "add a test for clamp()"   # แสดงแ�
 | `developer` | ทำงานตามโจทย์ด้วยการเปลี่ยนแปลงที่น้อยที่สุด | ใช่ |
 | `tester` | เพิ่มหรืออัปเดต test (เฉพาะไฟล์ test) | ใช่ |
 | `reviewer` | ตรวจการเปลี่ยนแปลงใน working tree และรายงานบั๊กกับความเสี่ยง | ไม่ |
+| `architecture` | อธิบายดีไซน์ ขอบเขตโมดูล และความเสี่ยง พร้อมแผนภาพ Mermaid เมื่อช่วยได้ | ไม่ |
+| `designer` | สร้างภาพ mockup หรือ diagram (ต้องใช้ Codex) เก็บในโฟลเดอร์ assets ของการรัน | ไม่ (เฉพาะ assets) |
+| `security` | ตรวจการเปลี่ยนแปลงใน working tree เรื่องความปลอดภัย | ไม่ |
 
 แต่ละ role คือการรัน orch ตามปกติหนึ่งครั้ง จึงใช้ routing, failover เมื่อติด rate limit, context preset และ ledger ได้ครบ เมื่อ failover ไปอีกเอเจนต์ role ยังคงชื่อ context preset และใช้ flag ของเอเจนต์นั้นเอง
 
@@ -62,7 +65,32 @@ roles:
     writes: false
 ```
 
-การสร้างภาพผ่าน Codex แบบ headless ยังไม่ได้ยืนยันตั้งแต่ต้นจนจบในเวอร์ชันนี้: การตรวจความพร้อมและ routing ทำงานได้ แต่ให้ตรวจผลของ role ที่สร้างภาพด้วยตัวเอง
+การสร้างภาพผ่าน Codex แบบ headless ใช้งานได้: ในการทดสอบมันสร้างไฟล์ PNG ที่ถูกต้องตาม path ที่สั่ง ต้องใช้ `-s workspace-write` ซึ่ง `designer` ในตัวมีให้แล้ว แต่ก็แพง: โลโก้เล็กๆ หนึ่งอันใช้ input ราว 121,000 โทเค่นของโควต้า Codex (ส่วนใหญ่เป็น cache) จากการเรียกเครื่องมือหลายรอบ จึงควรรัน role สร้างภาพเมื่อตั้งใจเท่านั้น
+
+ถ้าคุณส่ง [context preset](/th/guide/configuration#context-presets) ที่ปิดการสร้างภาพของ Codex (`minimal` ในตัวปิด) role สร้างภาพจะถูกข้ามพร้อมเหตุผลนั้น แทนที่จะรันโดยไม่มีความสามารถ
+
+## ภาพและ diagram
+
+role ที่มี `needs` จะได้โฟลเดอร์ assets คือ `.orch/runs/<run-id>/assets/` ซึ่ง orch สร้างให้และระบุไว้ท้าย prompt ของ role และสั่งให้บันทึกไฟล์ภาพและ diagram ที่นั่นเท่านั้น เมื่อ role จบ orch จะ **แสดงรายการไฟล์ที่อยู่ในโฟลเดอร์นั้นจริง** (`orch run` พิมพ์ส่วน `assets:` ผล MCP ก็แสดงรายการ) ไม่ได้อ่านชื่อไฟล์จากข้อความของ model ดังนั้น role ที่อ้างถึงไฟล์ที่ไม่ได้เขียนจะถูกรายงานว่าไม่มีไฟล์
+
+diagram แบบข้อความไม่ต้องใช้ Codex: role `architecture` เขียน Mermaid ในบล็อกโค้ดในคำตอบ และถูกบันทึกไปกับ artifact ของ role
+
+## การเลือกอัตโนมัติ
+
+`orch run --auto "..."` เลือก role ให้ด้วยกฎคำสำคัญธรรมดา ไม่เรียก model จึงไม่เสียโทเค่นในการเลือก เปิดใช้กับทุกการรันด้วย `auto.enabled: true` ใน config และใช้ `--no-auto` เพื่อข้ามในรันเดียว
+
+- **คำถามหรือการอธิบาย** ที่ไม่มีเจตนาเปลี่ยนโค้ด ("explain how...", "what does...") จะไม่เลือก role ใดเลย และรันเป็นการเรียกครั้งเดียว ซึ่งถูกที่สุด
+- งานอื่นเลือก `developer` เสมอ บวก: `tester` เมื่อมี test, bug, fix, regression, feature, implement; `reviewer` เมื่อมี refactor, migrate, implement, feature หรือ prompt ยาว; `security` เมื่อมี auth, login, token, password, secret, crypto, sql, upload, permission, payment; `architecture` เมื่อมี architecture, "design the", module, boundary, "api design", migrate; `designer` เมื่อมี ui, ux, screen, layout, mockup, wireframe, diagram, image, logo จับคู่ทั้งคำ ไม่สนตัวพิมพ์ เพิ่มคำของคุณเองใน `auto.keywords`
+- รันไม่เกิน `auto.maxRoles` role (ค่าเริ่มต้น 3) ถ้าตรงมากกว่านั้นจะเก็บตามลำดับ `developer`, `security`, `tester`, `reviewer`, `architecture`, `designer` และแสดงตัวที่ถูกตัด role ที่เลือกรันตามลำดับมาตรฐาน
+- ลำดับความสำคัญ: `--role`, `--roles` หรือ `--team` ชนะ `--auto` ถ้าใช้ร่วมกันจะ error ส่วน `--auto` ชนะ `auto.enabled`
+
+```bash
+orch explain "implement login with a password reset token"   # เลือก role อะไร เพราะอะไร ไม่เรียก model
+orch run --auto --dry-run "implement login with a password reset token"
+orch run --auto "fix the typo in README"
+```
+
+การรันแบบ auto จริงพิมพ์หนึ่งบรรทัดก่อนเริ่ม role: `auto: roles developer, tester` พร้อมเหตุผล
 
 ## วางแผนก่อนด้วย `--dry-run`
 

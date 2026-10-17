@@ -4,6 +4,10 @@ All notable changes are listed here. Add user-visible changes under **Unreleased
 
 ## Unreleased
 
+- Roles (phase 2): built-in `architecture`, `designer` and `security` roles and the `full` team. The `designer` needs Codex (`needs: [image]`): orch creates `.orch/runs/<run-id>/assets/`, names it in the prompt and reports the files actually left there (`assets:`). Headless Codex image generation was verified with a real run (valid PNG) and costs about 121,000 input tokens for a small logo. A context preset that disables `image_generation` (such as `minimal`) now makes image roles skip with that reason.
+- Automatic role selection: `orch run --auto`, `auto.enabled`, `--no-auto`, `auto.maxRoles` and `auto.keywords`; `orch explain "<prompt>"` shows the choice without a model call. A question selects no roles and runs as one plain call; selection is capped and the dropped roles are listed.
+- Config validation: role names are limited to letters, digits, `-` and `_`; empty teams and non-mapping role entries are rejected.
+
 - Roles (phase 1): `orch run --role NAME`, `--team NAME` or `--roles A,B` run a task through specialised roles (built-in `developer`, `tester`, `reviewer`; teams `quick` and `standard`), one ordinary run per role with its own agent, model, context and permission flags. Roles hand short `## Handoff` summaries to each other and save full answers under `.orch/runs/<run-id>/`. `--dry-run` shows the plan and the number of model calls; `--keep-going` and `--require-codex` control failures and the Codex readiness gate (installed, logged in, image generation enabled, not cooling down) for roles with `needs: [image]`. `orch usage --by role` shows what each role cost. Plain `orch run` is unchanged.
 
 - Context presets: `contexts` in the config (built-in `lean` and `minimal`) and `context:` on rules, `orch run --context NAME`, and a `context` parameter on MCP `orch_run` add flags that skip user-level settings, hooks, plugins and skills to shrink the fixed context of each call. Off unless selected; a failover keeps the preset name with the other agent's flags. `orch usage --by context` compares presets; `orch status` shows the preset used.

@@ -30,9 +30,12 @@ orch run --role reviewer "review the last commit"             # role เดี�
 orch run --team standard "เพิ่ม test ให้ clamp()"             # ทีมที่ตั้งชื่อไว้
 orch run --roles developer,tester "แก้บั๊กใน parser.ts"       # รายการของคุณ ตามลำดับ
 orch run --team standard --dry-run "เพิ่ม test ให้ clamp()"   # แสดงแผน ไม่เสียโทเค่น
+orch run --auto "แก้ typo ใน README"                          # เลือก role ให้ (ดู Roles)
+orch explain "แก้ typo ใน README"                             # --auto จะเลือก role อะไร เพราะอะไร
 ```
 
 - `--role`, `--roles` และ `--team` ใช้ร่วมกันไม่ได้ ส่วน `--dry-run`, `--require-codex` และ `--keep-going` ใช้ได้เมื่อมีตัวใดตัวหนึ่งข้างต้นเท่านั้น ถ้าไม่มี orch จะปฏิเสธแทนการเมิน
+- `--auto` เลือก role จาก prompt (ไม่เรียก model) ส่วน `--no-auto` ปิด `auto.enabled` ในรันเดียว `--auto` ใช้ร่วมกับ `--role`, `--roles` หรือ `--team` ไม่ได้ และ `orch explain "<prompt>"` แสดงการเลือกโดยไม่รัน
 - `--dry-run` แสดง role เอเจนต์ของมัน และจำนวนการเรียก model โดยไม่รันอะไร
 - `--require-codex` หยุดก่อนเริ่มเมื่อมี role ที่ต้องใช้ Codex และ Codex ไม่พร้อม ถ้าไม่ใส่ role นั้นจะถูกข้าม
 - `--keep-going` รัน role ที่เหลือต่อหลังมี role ล้ม ค่าเริ่มต้นทีมจะหยุด
@@ -72,7 +75,7 @@ tool_timeout_sec = 1800   # ค่าเริ่มต้นของ Codex ส
 
 Tools:
 
-- `orch_run({ prompt, cwd?, context?, role?, roles?, team?, dryRun?, requireCodex?, keepGoing? })` รันงานและคืนผลของเอเจนต์ ตามด้วยบรรทัด `[orch] status=... agent=... failedOver=...` ค่า `cwd` ต้องเป็นโฟลเดอร์ที่มีอยู่จริง
+- `orch_run({ prompt, cwd?, context?, role?, roles?, team?, auto?, dryRun?, requireCodex?, keepGoing? })` รันงานและคืนผลของเอเจนต์ ตามด้วยบรรทัด `[orch] status=... agent=... failedOver=...` ค่า `cwd` ต้องเป็นโฟลเดอร์ที่มีอยู่จริง
 - `orch_status()` คืน cooldown และงานล่าสุดเป็น JSON
 
 การยกเลิกคำสั่งจะหยุดเอเจนต์ที่กำลังรันด้วย

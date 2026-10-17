@@ -113,7 +113,7 @@ rules:
   (defaults: Claude `--model` / `--effort`, Codex `-m` / `-c model_reasoning_effort=`).
   `orch status` shows the model used for each job.
 - **Shrink the fixed context** of small tasks with a preset: add `context: lean` to a rule, or run `orch run --context lean "..."`. Presets skip user-level hooks, plugins and skills (about -48% cost on small Claude tasks in the benchmarks) and are off unless selected. See the Configuration page.
-- **Roles** split a task into developer, tester and reviewer steps (opt-in): `orch run --team standard "..."`, `--role reviewer`, `--dry-run` to see the plan first. Several roles cost several calls; see the Roles page.
+- **Roles** split a task into developer, tester and reviewer steps (opt-in): `orch run --team standard "..."`, `--role reviewer`, `--dry-run` to see the plan first. Several roles cost several calls; see the Roles page. `--auto` (or `auto.enabled`) picks roles from the prompt with keyword rules and no model call, `orch explain "..."` shows why, and the `designer` role makes images through Codex after checking Codex is ready.
 - `limitPatterns` and `authPatterns` (regexes matched against stderr and the last
   20 lines of stdout) can be overridden per agent if a real error is not detected.
 - Remove `summaryArgs` to disable the handoff summary.

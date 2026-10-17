@@ -20,7 +20,7 @@ describe("docs stay in sync with the code", () => {
   it("documents every config key in guide/configuration.md", () => {
     const keys = [
       ...Object.keys(DEFAULT_CONFIG.agents.claude),
-      "defaultAgent", "agents", "rules", "match", "agent", "model", "effort", "contexts", "context", "roles", "teams", "pipeline", "handoffChars", "prompt", "needs", "writes", "agentArgs",
+      "defaultAgent", "agents", "rules", "match", "agent", "model", "effort", "contexts", "context", "roles", "teams", "pipeline", "handoffChars", "prompt", "needs", "writes", "agentArgs", "auto", "enabled", "maxRoles", "keywords",
     ];
     const page = read("guide/configuration.md");
     for (const k of keys) expect(page, `\`${k}\` is not in guide/configuration.md`).toContain(`\`${k}\``);
@@ -28,7 +28,7 @@ describe("docs stay in sync with the code", () => {
 
   it("documents the --context and role flags in guide/usage.md", () => {
     const page = read("guide/usage.md");
-    for (const f of ["--context", "--role", "--roles", "--team", "--dry-run", "--require-codex", "--keep-going"]) {
+    for (const f of ["--context", "--role", "--roles", "--team", "--dry-run", "--require-codex", "--keep-going", "--auto", "--no-auto", "orch explain"]) {
       expect(page, f).toContain(f);
     }
   });

@@ -5,7 +5,7 @@ A **role** is a specialised run of an agent: a developer implements, a tester wr
 Roles are opt-in. `orch run "..."` without a role flag behaves exactly as before.
 
 ::: info In this release
-Built-in roles: `developer`, `tester`, `reviewer`. The `quick` team is `developer`; the `standard` team is `developer`, `tester`, `reviewer`. Architecture, designer and security roles, automatic role selection and parallel read-only roles are planned. You can already define your own roles and teams in the config.
+Six built-in roles: `architecture`, `designer`, `developer`, `tester`, `reviewer`, `security`. Teams: `quick` (`developer`), `standard` (`developer`, `tester`, `reviewer`) and `full` (all six). Automatic role selection (`--auto`) and image roles on Codex are included. Running read-only roles in parallel is planned. You can define your own roles and teams in the config.
 :::
 
 ## Ways to run
@@ -30,6 +30,9 @@ orch run --team standard --dry-run "add a test for clamp()"   # show the plan, s
 | `developer` | Implements the task with the smallest change | yes |
 | `tester` | Adds or updates tests (test files only) | yes |
 | `reviewer` | Reviews the working-tree changes and reports bugs and risks | no |
+| `architecture` | Describes the design, module boundaries and risks, with a Mermaid diagram when it helps | no |
+| `designer` | Creates mockup or diagram images (needs Codex), saved in the run's assets directory | no (only assets) |
+| `security` | Reviews the working-tree changes for security problems | no |
 
 Each role is one ordinary orch run, so routing, rate-limit failover, context presets and the usage ledger all apply. After a failover to the other agent the role keeps its context preset and gets that agent's own flags.
 
@@ -62,7 +65,32 @@ roles:
     writes: false
 ```
 
-Image generation through headless Codex has not been verified end to end in this release: the readiness check and routing work, but check the result of an image role yourself.
+Image generation through headless Codex works: in a test it produced a valid PNG at the path it was given. It needs `-s workspace-write`, which the built-in `designer` carries. It is also expensive: one small logo used about 121,000 input tokens of Codex quota (most of it cached) over several tool calls, so run image roles on purpose.
+
+If you pass a [context preset](/guide/configuration#context-presets) that turns off Codex image generation (the built-in `minimal` does), image roles are skipped with that reason instead of running without the capability.
+
+## Images and diagrams
+
+A role with `needs` gets an assets directory, `.orch/runs/<run-id>/assets/`, which orch creates and names at the end of the role's prompt. The role is told to save image and diagram files there and nowhere else. After the role finishes, orch **lists the files that are actually in that directory** and reports them (`orch run` prints an `assets:` section; the MCP result lists them). It does not read file names out of the model's text, so a role that claims a file it did not write is reported as having no files.
+
+Text diagrams do not need Codex: the `architecture` role writes Mermaid in a fenced block in its answer, and that is saved with the role's artifact.
+
+## Automatic selection
+
+`orch run --auto "..."` picks the roles for you with plain keyword rules; it never calls a model, so choosing costs nothing. Turn it on for every run with `auto.enabled: true` in the config, and use `--no-auto` to skip it for one run.
+
+- A **question or explanation** with no change intent ("explain how...", "what does...") selects **no roles** and runs as one plain call, the cheapest path.
+- Any other task selects `developer`, plus: `tester` for test, bug, fix, regression, feature, implement; `reviewer` for refactor, migrate, implement, feature, or a long prompt; `security` for auth, login, token, password, secret, crypto, sql, upload, permission, payment; `architecture` for architecture, "design the", module, boundary, "api design", migrate; `designer` for ui, ux, screen, layout, mockup, wireframe, diagram, image, logo. Words match whole words, ignoring case. Add your own words under `auto.keywords`.
+- At most `auto.maxRoles` roles run (default 3). When more match, `developer`, `security`, `tester`, `reviewer`, `architecture`, `designer` are kept in that priority, and the ones cut are listed. Selected roles run in the canonical order.
+- Precedence: `--role`, `--roles` or `--team` beat `--auto`; combining them is an error. `--auto` beats `auto.enabled`.
+
+```bash
+orch explain "implement login with a password reset token"   # which roles, and why; no model call
+orch run --auto --dry-run "implement login with a password reset token"
+orch run --auto "fix the typo in README"
+```
+
+A real auto run prints one line before the roles: `auto: roles developer, tester` with the reasons.
 
 ## Plan first with `--dry-run`
 
