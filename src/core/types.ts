@@ -82,6 +82,8 @@ export interface Attempt {
   outcome: Outcome;
   exitCode: number | null;
   stderr: string;
+  usage?: Usage;
+  model?: string;
 }
 
 export interface TaskResult {
@@ -90,6 +92,8 @@ export interface TaskResult {
   output: string;
   failedOver: boolean;
   attempts: Attempt[];
+  /** token usage of the final attempt, when the agent reported it */
+  usage?: Usage;
   message?: string;
 }
 

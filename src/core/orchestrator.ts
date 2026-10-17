@@ -1,15 +1,19 @@
+import { randomUUID } from "node:crypto";
 import { buildAgentArgs } from "./agent-args.js";
 import { classify, relevantText } from "./detector.js";
 import { buildHandoff } from "./handoff.js";
+import { parseAgentOutput } from "./output.js";
 import { parseResetTime } from "./reset.js";
 import { type Route, otherAgent, pickRoute } from "./router.js";
 import type { StateStore } from "./state.js";
 import type { AgentName, Attempt, Config, RunFn, TaskResult } from "./types.js";
+import type { Ledger } from "./usage.js";
 
 export interface Deps {
   config: Config;
   state: StateStore;
   run: RunFn;
+  ledger?: Ledger;
   now?: () => number;
 }
 
@@ -49,7 +53,7 @@ async function requestSummary(
     depth: req.depth,
     timeoutMs: SUMMARY_TIMEOUT_MS,
   });
-  const text = r.stdout.trim();
+  const text = parseAgentOutput(cfg.output, r.stdout).text.trim();
   return r.exitCode === 0 && text ? text : undefined;
 }
 
@@ -102,26 +106,52 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
   }
 
   const first = route.agent;
+  const routedModel = route.model;
+  const taskId = randomUUID().slice(0, 8);
   const runAttempt = async (agent: AgentName, prompt: string, choice: Route = { agent }) => {
     const cfg = config.agents[agent];
+    const startedAt = now();
     const result = await run(cfg.command, buildAgentArgs(cfg, choice), prompt, {
       cwd: req.cwd,
       depth: req.depth,
-      onChunk: req.onChunk,
+      // JSON agents print machine output; only plain-text agents are streamed live.
+      onChunk: cfg.output === "text" ? req.onChunk : undefined,
       signal: req.signal,
     });
+    const parsed = parseAgentOutput(cfg.output, result.stdout);
     // CLIs such as codex echo the prompt; remove it so our own handoff wording
     // ("hit a usage/rate limit") is never mistaken for a limit error.
     const scrub = (s: string) => s.split(prompt).join("");
-    const scrubbed = { ...result, stdout: scrub(result.stdout), stderr: scrub(result.stderr) };
-    const outcome = classify(scrubbed, cfg.limitPatterns, cfg.authPatterns);
+    const judged = {
+      exitCode: result.exitCode,
+      stdout: scrub(parsed.errorText ?? parsed.text),
+      stderr: scrub(result.stderr),
+    };
+    const outcome = classify(judged, cfg.limitPatterns, cfg.authPatterns);
     if (outcome === "limited") {
-      const until =
-        parseResetTime(relevantText(scrubbed), now()) ?? now() + cfg.defaultCooldownSec * 1000;
+      const until = parseResetTime(relevantText(judged), now()) ?? now() + cfg.defaultCooldownSec * 1000;
       state.setCooldown(agent, until);
     }
-    const attempt: Attempt = { agent, outcome, exitCode: result.exitCode, stderr: result.stderr };
-    return { result, outcome, attempt };
+    const model = agent === first ? routedModel : undefined;
+    const attempt: Attempt = {
+      agent,
+      outcome,
+      exitCode: result.exitCode,
+      stderr: result.stderr,
+      ...(parsed.usage ? { usage: parsed.usage } : {}),
+      ...(model ? { model } : {}),
+    };
+    deps.ledger?.append({
+      at: startedAt,
+      taskId,
+      agent,
+      ...(model ? { model } : {}),
+      outcome,
+      ...(parsed.usage ? { usage: parsed.usage } : {}),
+      durationMs: now() - startedAt,
+      promptChars: req.prompt.length,
+    });
+    return { text: parsed.text, detail: parsed.errorText ?? result.stderr, outcome, attempt };
   };
 
   const a1 = await runAttempt(first, req.prompt, route);
@@ -129,9 +159,10 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     return record({
       status: "ok",
       agent: first,
-      output: a1.result.stdout,
+      output: a1.text,
       failedOver: false,
       attempts: [a1.attempt],
+      usage: a1.attempt.usage,
     });
   }
 
@@ -139,7 +170,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     return record({
       status: "failed",
       agent: first,
-      output: a1.result.stdout,
+      output: a1.text,
       failedOver: false,
       attempts: [a1.attempt],
       message: "aborted by caller",
@@ -151,7 +182,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     return record({
       status: "failed",
       agent: first,
-      output: a1.result.stdout,
+      output: a1.text,
       failedOver: false,
       attempts: [a1.attempt],
       message: withAuthHints(
@@ -175,14 +206,15 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
   return record({
     status: a2.outcome === "ok" ? "ok" : "failed",
     agent: second,
-    output: a2.result.stdout,
+    output: a2.text,
     failedOver: true,
     attempts: [a1.attempt, a2.attempt],
+    usage: a2.attempt.usage,
     message:
       a2.outcome === "ok"
         ? undefined
         : withAuthHints(
-            `${first} ${a1.outcome}, then ${second} ${a2.outcome}: ${a2.result.stderr.trim().slice(0, 300)}`,
+            `${first} ${a1.outcome}, then ${second} ${a2.outcome}: ${a2.detail.trim().slice(0, 300)}`,
             [a1.attempt, a2.attempt],
           ),
   });

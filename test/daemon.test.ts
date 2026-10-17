@@ -18,7 +18,8 @@ function setup(run: RunFn) {
   // keep the path short: unix socket paths are limited to ~104 chars on macOS
   const dir = mkdtempSync(join(tmpdir(), "orch-"));
   const sockPath = join(dir, "sock");
-  const deps = { config: DEFAULT_CONFIG, state: new StateStore(join(dir, "state.json")), run };
+  const config = { ...DEFAULT_CONFIG, agents: { ...DEFAULT_CONFIG.agents, claude: { ...DEFAULT_CONFIG.agents.claude, output: "text" as const } } };
+  const deps = { config, state: new StateStore(join(dir, "state.json")), run };
   return { dir, sockPath, deps };
 }
 
