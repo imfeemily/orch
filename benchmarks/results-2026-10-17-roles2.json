@@ -1,0 +1,70 @@
+{
+  "meta": {
+    "date": "2026-10-17",
+    "node": "v24.16.0",
+    "claude": "2.1.231 (Claude Code)",
+    "codex": "codex-cli 0.162.1",
+    "platform": "darwin"
+  },
+  "records": [
+    {
+      "id": "G-designer",
+      "experiment": "G",
+      "task": "design a login screen mockup (image role)",
+      "variant": "orch --role designer (Codex)",
+      "agent": "codex",
+      "models": [
+        "(default)"
+      ],
+      "usage": {
+        "inputTokens": 19989,
+        "cacheReadTokens": 110592,
+        "outputTokens": 1211,
+        "costUsd": 0
+      },
+      "billableTokens": 21200,
+      "costUsd": 0,
+      "durationMs": 22597,
+      "success": true,
+      "answerPreview": "[login-screen-mockup.svg](/private/var/folders/72/1g0mlgts5xv456rtdsqmnmjc0000gn/T/orch-bench-CV2Q8H/G-designer/.orch/runs/2093e231/assets/login-screen-mockup.s",
+      "assetFiles": [
+        "login-screen-mockup.svg"
+      ]
+    },
+    {
+      "id": "G-auto",
+      "experiment": "G",
+      "task": "write a small test",
+      "variant": "orch --auto",
+      "agent": "claude",
+      "models": [
+        "(default)"
+      ],
+      "usage": {
+        "inputTokens": 82726,
+        "cacheReadTokens": 195483,
+        "outputTokens": 2263,
+        "costUsd": 0.5889099
+      },
+      "billableTokens": 84989,
+      "costUsd": 0.5889099,
+      "durationMs": 40323,
+      "success": true,
+      "answerPreview": "## developer\nCreated `test/math.test.ts` with 5 cases covering `add` (positive, negative) and `clamp` (in-range, below-min, above-max).\n\n## Handoff\nFile `test/m",
+      "perRole": {
+        "developer": {
+          "billableTokens": 42323,
+          "costUsd": 0.2927193
+        },
+        "tester": {
+          "billableTokens": 42666,
+          "costUsd": 0.2961906
+        }
+      },
+      "autoRoles": [
+        "developer",
+        "tester"
+      ]
+    }
+  ]
+}

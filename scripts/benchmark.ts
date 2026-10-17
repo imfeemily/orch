@@ -7,10 +7,11 @@
  * A: model routing   B: orch overhead   C: handoff cost   D: fixed context per call
  * E: context presets (`--context lean`) against the default context
  * F: roles: one plain call against `--team standard` on the same task
+ * G: the designer role on Codex (image files) and `--auto` on the same small task
  * Everything runs in temporary copies of a small seeded repository.
  */
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,7 +24,7 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const CLI = join(ROOT, "dist/cli/index.js");
 const args = process.argv.slice(2);
 const flag = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
-const only = new Set((flag("--only") ?? "A,B,C,D,E,F").split(","));
+const only = new Set((flag("--only") ?? "A,B,C,D,E,F,G").split(","));
 const date = new Date().toISOString().slice(0, 10);
 const C_REPEATS = Number(flag("--c-repeats") ?? 1);
 const SKIP_SUMMARY = args.includes("--skip-summary");
@@ -31,7 +32,7 @@ const OUT = resolve(flag("--out") ?? join(ROOT, `benchmarks/results-${date}.json
 
 interface RunRecord {
   id: string;
-  experiment: "A" | "B" | "C" | "D" | "E" | "F";
+  experiment: "A" | "B" | "C" | "D" | "E" | "F" | "G";
   task: string;
   variant: string;
   agent: "claude" | "codex";
@@ -46,6 +47,10 @@ interface RunRecord {
   answerPreview?: string;
   /** tokens and cost per role, for team runs */
   perRole?: Record<string, { billableTokens: number; costUsd: number }>;
+  /** image or diagram files an image role left in its assets directory */
+  assetFiles?: string[];
+  /** the roles automatic selection chose */
+  autoRoles?: string[];
 }
 
 const records: RunRecord[] = [];
@@ -372,11 +377,40 @@ function expF() {
   });
 }
 
+/** Files left in any run's assets directory under a project. */
+function findAssets(project: string): string[] {
+  const out: string[] = [];
+  try {
+    const runs = join(project, ".orch", "runs");
+    for (const id of readdirSync(runs)) {
+      const dir = join(runs, id, "assets");
+      if (!existsSync(dir)) continue;
+      for (const f of readdirSync(dir)) out.push(join(dir, f));
+    }
+  } catch { /* no runs */ }
+  return out;
+}
+
+/** The image role on Codex, and automatic role selection on the "write a small test" task. */
+function expG() {
+  const designDir = freshRepo("G-designer");
+  const d = viaOrch(designDir, "Design a simple login screen mockup: an email field, a password field and a Sign in button, clean and minimal.", "", ["--role", "designer"]);
+  const files = findAssets(designDir);
+  record("G-designer", "G", "design a login screen mockup (image role)", "orch --role designer (Codex)", "codex", d, files.length > 0, { assetFiles: files.map((f) => f.split("/").pop() as string) });
+
+  const t = TASKS.T2;
+  const autoDir = freshRepo("G-auto");
+  const a = viaOrch(autoDir, t.prompt, "", ["--auto"]);
+  const line = (a.stderr ?? "").split("\n").find((l) => l.startsWith("auto: roles")) ?? "";
+  const roles = line.replace("auto: roles", "").split(",").map((s) => s.trim()).filter(Boolean);
+  record("G-auto", "G", t.name, "orch --auto", "claude", a, t.check(autoDir, a.text), { perRole: perRole(a.entries), autoRoles: roles });
+}
+
 async function main() {
   if (!existsSync(CLI)) throw new Error("dist/ is missing: run `npm run build` first");
   console.log(`Benchmark: spends real tokens. Experiments: ${[...only].join(", ")}. Output: ${OUT}`);
   seedRepo();
-  const steps: Array<[string, () => void | Promise<void>]> = [["A", expA], ["B", expB], ["C", expC], ["D", expD], ["E", expE], ["F", expF]];
+  const steps: Array<[string, () => void | Promise<void>]> = [["A", expA], ["B", expB], ["C", expC], ["D", expD], ["E", expE], ["F", expF], ["G", expG]];
   for (const [name, fn] of steps) {
     if (!only.has(name)) continue;
     console.log(`\n== Experiment ${name}`);

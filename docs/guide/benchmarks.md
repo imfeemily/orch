@@ -1,6 +1,6 @@
 # Benchmarks: where orch saves tokens
 
-These are real runs of the real `claude` and `codex` on one machine, measured on 2026-10-17. They show **which orch features reduce cost, by how much, and which do not**. Raw data is in `benchmarks/results-2026-10-17.json` and `benchmarks/results-2026-10-17-handoff-repeat.json` `benchmarks/results-2026-10-17-context.json` and `benchmarks/results-2026-10-17-roles.json`; the harness is `scripts/benchmark.ts`.
+These are real runs of the real `claude` and `codex` on one machine, measured on 2026-10-17. They show **which orch features reduce cost, by how much, and which do not**. Raw data is in `benchmarks/results-2026-10-17.json`, `-handoff-repeat.json`, `-context.json`, `-roles.json` and `-roles2.json` (all in `benchmarks/`); the harness is `scripts/benchmark.ts`.
 
 ::: warning Read the limits first
 Few runs, one machine, one small repository, three small tasks. Treat the numbers as a direction, not statistics. Identical runs differ a lot (see [Noise](#noise-the-same-task-varied-by-38)), so only differences much bigger than about 40% mean something.
@@ -16,6 +16,8 @@ Few runs, one machine, one small repository, three small tasks. Treat the number
 | orch itself | **No measurable overhead** (+0.7% tokens, +5.8% cost, within noise); orch makes no LLM calls of its own | Good |
 | **Context presets** (`--context lean`): skip user-level hooks, plugins and skills | **-48% cost** across the same 3 tasks with the default model (-41% against every default run in this study), all correct; Codex **-18% input per call** | Medium: consistent direction, but one run per task and about ±30% noise |
 | **Roles** (`--team standard`: developer, tester, reviewer) | **Costs more, by design:** 2.5x the tokens, 2.8x the cost and 3.7x the time of one plain call on a small task; all three roles succeeded | Medium: one task, one run |
+| **Image role** (`--role designer` on Codex) | A valid SVG mockup in 23 s; **21,200 billable tokens** (19,989 input + 1,211 output, plus 110,592 cached input) | Medium: one run |
+| **Auto selection** (`--auto`) | Chose `developer` and `tester` for a small test task: **2 calls, $0.5889** against $0.8078 for the 3-role team and $0.2931 for one call | Medium: one run |
 | **Fixed context per call** if you do nothing | Not reduced by default: 44% to 86% of the cost of a small task. `--safe-mode` (preset `minimal`) cuts a one-word call by 68% but also drops project instructions | Good |
 
 The key point: **orch saves money mainly by choosing a cheaper model for small tasks, not by sending fewer tokens.** Token counts barely moved (-27%), cost fell by three quarters because a token on `haiku` is much cheaper than a token on `sonnet`.
@@ -134,6 +136,14 @@ What the extra calls bought: the reviewer checked the generated test against the
 
 **Reading it honestly.** On a task this small, three roles cost about three times one call and mostly confirm what one call already did. Roles earn their cost on changes that deserve a second look: larger edits, risky areas, code you will not read line by line. For small edits, use one call (and a model and context preset from the experiments above). One run of one task: treat the multiple as a rough guide.
 
+## Experiment G: the image role and auto selection
+
+**The designer on Codex.** `orch run --role designer "Design a simple login screen mockup..."` created `login-screen-mockup.svg` (1,995 bytes, a valid SVG with a title, a centred form, email and password fields and a Sign in button) under `.orch/runs/<run-id>/assets/`, and `orch run` listed it under `assets:`. It took 23 seconds and 21,200 billable tokens (19,989 input, 1,211 output) with another 110,592 input tokens read from cache. The earlier probe that asked for a PNG logo drew with Pillow and used about 121,000 input tokens in total, so expect roughly 100,000 to 130,000 input tokens (mostly cached) per image role on this machine. Codex chose the format (SVG here, PNG in the probe); ask for a format in your role prompt if it matters.
+
+**Auto selection.** `orch run --auto` on the "write a small test" task chose `developer` and `tester` (the word `test`), spending 84,989 tokens and $0.5889 (developer $0.2927, tester $0.2962) in 40 seconds, and the test file was created. For the same task one plain call cost $0.2931 and the `standard` team (three roles) $0.8078. Auto did not add a reviewer because the prompt had no word that asks for one. As with any team, the extra role roughly doubled the cost of the plain call.
+
+Limits: one run each. The image result is the model's drawing, not a measure of design quality.
+
 ## What to do with this
 
 1. **Add model rules for small tasks.** This is the saving that measured clearly. Start with typo, rename, explain and small-test rules (see [Configuration](/guide/configuration)), check `orch usage --by model`, and widen only if results stay correct.
@@ -159,6 +169,7 @@ npm run benchmark                                  # all experiments, real token
 npm run benchmark -- --only A,B                    # a subset
 npm run benchmark -- --only E                      # context presets
 npm run benchmark -- --only F                      # roles: one call against a team
+npm run benchmark -- --only G                      # the image role and auto selection
 npm run benchmark -- --only C --c-repeats 4 --skip-summary --out benchmarks/my-run.json
 ```
 
