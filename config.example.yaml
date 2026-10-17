@@ -3,12 +3,14 @@ defaultAgent: claude
 agents:
   claude:
     command: claude
-    args: ["-p", "--", "{prompt}"]      # "--" keeps a prompt starting with "-" from being read as a flag
+    args: ["-p", "--output-format", "json", "--", "{prompt}"]   # "--" keeps a prompt starting with "-" from being read as a flag
+    output: claude-json                 # how to read stdout: claude-json | codex-jsonl | text
     summaryArgs: ["-c", "-p", "--", "{prompt}"]
     defaultCooldownSec: 3600
   codex:
     command: codex
-    args: ["exec", "--", "{prompt}"]
+    args: ["exec", "--json", "--", "{prompt}"]
+    output: codex-jsonl
     summaryArgs: ["exec", "resume", "--last", "--", "{prompt}"]
     defaultCooldownSec: 3600
 rules:

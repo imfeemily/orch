@@ -11,12 +11,12 @@ describe("buildAgentArgs", () => {
   });
 
   it("inserts model flags before the -- that guards the prompt", () => {
-    expect(buildAgentArgs(claude, { model: "sonnet" })).toEqual(["-p", "--model", "sonnet", "--", "{prompt}"]);
+    expect(buildAgentArgs(claude, { model: "sonnet" })).toEqual(["-p", "--output-format", "json", "--model", "sonnet", "--", "{prompt}"]);
   });
 
   it("inserts model and effort for codex", () => {
     expect(buildAgentArgs(codex, { model: "gpt-6-luna", effort: "low" })).toEqual([
-      "exec", "-m", "gpt-6-luna", "-c", 'model_reasoning_effort="low"', "--", "{prompt}",
+      "exec", "--json", "-m", "gpt-6-luna", "-c", 'model_reasoning_effort="low"', "--", "{prompt}",
     ]);
   });
 

@@ -36,6 +36,18 @@ describe("loadConfig", () => {
     }
   });
 
+  it("defaults to JSON output for both agents", () => {
+    expect(DEFAULT_CONFIG.agents.claude.output).toBe("claude-json");
+    expect(DEFAULT_CONFIG.agents.codex.output).toBe("codex-jsonl");
+    expect(DEFAULT_CONFIG.agents.claude.args).toContain("--output-format");
+    expect(DEFAULT_CONFIG.agents.codex.args).toContain("--json");
+  });
+
+  it("accepts output: text and rejects an unknown output kind", () => {
+    expect(loadConfig(tmpFile("agents:\n  claude:\n    output: text\n")).agents.claude.output).toBe("text");
+    expect(() => loadConfig(tmpFile("agents:\n  claude:\n    output: yaml\n"))).toThrow(/output/);
+  });
+
   it("rejects an unknown defaultAgent", () => {
     expect(() => loadConfig(tmpFile("defaultAgent: gemini\n"))).toThrow(/defaultAgent/);
   });

@@ -2,9 +2,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { parse, stringify } from "yaml";
-import type { AgentName, Config } from "./types.js";
+import type { AgentName, Config, OutputKind } from "./types.js";
 
 export const AGENT_NAMES: AgentName[] = ["claude", "codex"];
+const OUTPUT_KINDS: OutputKind[] = ["claude-json", "codex-jsonl", "text"];
 
 const LIMIT_PATTERNS = [
   "rate.?limit",
@@ -30,7 +31,8 @@ export const DEFAULT_CONFIG: Config = {
   agents: {
     claude: {
       command: "claude",
-      args: ["-p", "--", "{prompt}"],
+      args: ["-p", "--output-format", "json", "--", "{prompt}"],
+      output: "claude-json",
       summaryArgs: ["-c", "-p", "--", "{prompt}"],
       modelArgs: ["--model", "{model}"],
       effortArgs: ["--effort", "{effort}"],
@@ -40,7 +42,8 @@ export const DEFAULT_CONFIG: Config = {
     },
     codex: {
       command: "codex",
-      args: ["exec", "--", "{prompt}"],
+      args: ["exec", "--json", "--", "{prompt}"],
+      output: "codex-jsonl",
       summaryArgs: ["exec", "resume", "--last", "--", "{prompt}"],
       modelArgs: ["-m", "{model}"],
       effortArgs: ["-c", 'model_reasoning_effort="{effort}"'],
@@ -101,6 +104,9 @@ function validate(cfg: Config): void {
     }
   }
   for (const name of AGENT_NAMES) {
+    if (!OUTPUT_KINDS.includes(cfg.agents[name].output)) {
+      throw new Error(`agents.${name}.output must be one of ${OUTPUT_KINDS.join(", ")}`);
+    }
     cfg.agents[name].limitPatterns.forEach(assertRegex);
     cfg.agents[name].authPatterns.forEach(assertRegex);
   }

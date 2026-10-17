@@ -27,6 +27,8 @@ export interface AgentConfig {
   args: string[];
   /** argv template used to ask the agent for a summary (handoff v2); omit to disable */
   summaryArgs?: string[];
+  /** how to read this agent's stdout (answer, error text, token usage) */
+  output: OutputKind;
   /** argv template inserted when a rule picks a model; every "{model}" is replaced */
   modelArgs?: string[];
   /** argv template inserted when a rule picks an effort level; every "{effort}" is replaced */
