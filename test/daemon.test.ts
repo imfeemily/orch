@@ -44,6 +44,19 @@ describe("daemon", () => {
     if (final.type === "result") expect(final.result.status).toBe("ok");
   });
 
+  it("sends progress messages that are not the final reply", async () => {
+    const s = setup(okRun);
+    closers.push((await startDaemon({ sockPath: s.sockPath, deps: s.deps })).close);
+    const progress: string[] = [];
+    const final = await sendRequest(
+      s.sockPath,
+      { type: "run", prompt: "hello", cwd: s.dir, depth: 0, team: "quick" },
+      (m) => m.type === "progress" && progress.push(m.text),
+    );
+    expect(final.type).toBe("result");
+    expect(progress.some((l) => l.startsWith("developer: started"))).toBe(true);
+  });
+
   it("forwards context to the run and reports an unknown context as rejected", async () => {
     const seen: string[][] = [];
     const run: RunFn = async (_c, args) => {

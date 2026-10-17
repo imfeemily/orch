@@ -34,7 +34,7 @@ export function sendRequest(
         buf = buf.slice(i + 1);
         if (!line.trim()) continue;
         const msg = JSON.parse(line) as Message;
-        if (msg.type === "chunk") {
+        if (msg.type === "chunk" || msg.type === "progress") {
           onChunk(msg);
         } else {
           done = true;

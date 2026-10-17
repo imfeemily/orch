@@ -136,6 +136,7 @@ export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promi
               sequential: req.sequential === true,
               signal,
               onChunk: (text) => send({ type: "chunk", text }),
+              onProgress: (text) => send({ type: "progress", text }),
             },
           );
           send({ type: "result", result });

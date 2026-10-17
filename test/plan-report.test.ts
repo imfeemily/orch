@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAssets, formatPlan, formatRoles, formatSelection } from "../src/cli/plan-report.js";
+import { formatAssets, formatPlan, formatRoles, formatSelection } from "../src/core/plan-report.js";
 import type { TaskResult } from "../src/core/types.js";
 
 const base: TaskResult = { status: "planned", agent: null, output: "", failedOver: false, attempts: [] };

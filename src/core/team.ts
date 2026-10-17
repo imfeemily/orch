@@ -20,6 +20,8 @@ export interface TeamRequest extends RoleSelection {
   context?: string;
   signal?: AbortSignal;
   onChunk?: (text: string) => void;
+  /** one line when a role of a team starts or finishes */
+  onProgress?: (text: string) => void;
   dryRun?: boolean;
   requireCodex?: boolean;
   keepGoing?: boolean;
@@ -273,6 +275,7 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
     const done = await Promise.all(
       toRun.map(async (step) => {
         const role = config.roles[step.role];
+        req.onProgress?.(`${step.role}: started (${step.agent ?? "-"})`);
         const assets = prepareAssets(req.cwd, runId, step.role, role.needs.length > 0);
         const prompt = buildRolePrompt(role, req.task, snapshot, true, assets?.rel);
         let r: TaskResult;
@@ -290,6 +293,7 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
           // a call that throws fails its role; it must not take its siblings' results with it
           r = { status: "failed", agent: step.agent, output: "", failedOver: false, attempts: [], message: e instanceof Error ? e.message : String(e) };
         }
+        req.onProgress?.(`${step.role}: ${r.status}`);
         return { step, assets, r };
       }),
     );

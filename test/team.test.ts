@@ -89,6 +89,16 @@ describe("runRoles: single role", () => {
 });
 
 describe("runRoles: team", () => {
+  it("reports progress as each role starts and finishes, in a team only", async () => {
+    const s = setup({});
+    const lines: string[] = [];
+    await go(s, { roles: ["developer", "tester"] }, { onProgress: (t: string) => lines.push(t) });
+    expect(lines).toEqual(["developer: started (claude)", "developer: ok", "tester: started (claude)", "tester: ok"]);
+    const single: string[] = [];
+    await go(setup({}), { role: "reviewer" }, { onProgress: (t: string) => single.push(t) });
+    expect(single).toEqual([]);
+  });
+
   it("runs the standard team in order, passing handoffs forward and writing artifacts", async () => {
     const s = setup({});
     writeFileSync(join(s.cwd, ".gitignore"), "node_modules\n");
