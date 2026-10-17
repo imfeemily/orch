@@ -57,6 +57,13 @@ describe("mcp server", () => {
     expect(res.content[0].text).toContain("status=ok");
     expect(res.content[0].text).toContain("tokens=12");
     expect(seenArgs[0]).toContain("--setting-sources"); // the context parameter reached the agent
+
+    const team = (await client.callTool({
+      name: "orch_run",
+      arguments: { prompt: "add tests", cwd: home, team: "quick" },
+    })) as { content: Array<{ text: string }>; isError?: boolean };
+    expect(team.isError).toBeFalsy();
+    expect(team.content[0].text).toContain("roles=developer:ok");
     expect(res.content[0].text).not.toContain("input_tokens");
   }, 20_000);
 });

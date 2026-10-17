@@ -57,6 +57,28 @@ describe("daemon", () => {
     expect(bad.type === "result" && bad.result.status).toBe("rejected");
   });
 
+  it("runs a team through the daemon, in order, and plans without running on dryRun", async () => {
+    const seen: string[] = [];
+    const run: RunFn = async (_c, _a, prompt) => {
+      seen.push(prompt);
+      return { exitCode: 0, stdout: "ok\n## Handoff\nnote", stderr: "" };
+    };
+    const s = setup(run);
+    closers.push((await startDaemon({ sockPath: s.sockPath, deps: s.deps })).close);
+    const team = await sendRequest(s.sockPath, { type: "run", prompt: "add tests", cwd: s.dir, depth: 0, team: "standard" }, () => {});
+    expect(team.type === "result" && team.result.roles?.map((r) => r.role)).toEqual(["developer", "tester", "reviewer"]);
+    expect(seen).toHaveLength(3);
+    expect(seen[0]).toContain(DEFAULT_CONFIG.roles.developer.prompt);
+
+    seen.length = 0;
+    const dry = await sendRequest(s.sockPath, { type: "run", prompt: "add tests", cwd: s.dir, depth: 0, team: "quick", dryRun: true }, () => {});
+    expect(dry.type === "result" && dry.result.status).toBe("planned");
+    expect(seen).toHaveLength(0);
+
+    const bad = await sendRequest(s.sockPath, { type: "run", prompt: "x", cwd: s.dir, depth: 0, role: "reviewer", team: "quick" }, () => {});
+    expect(bad.type === "result" && bad.result.status).toBe("rejected");
+  });
+
   it("answers status", async () => {
     const s = setup(okRun);
     closers.push((await startDaemon({ sockPath: s.sockPath, deps: s.deps })).close);

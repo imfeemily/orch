@@ -5,6 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { orchHome } from "../core/config.js";
 import { billableTokens } from "../core/usage.js";
+import { formatPlan } from "../cli/plan-report.js";
 import { connectOrStart, sendRequest } from "../daemon/client.js";
 
 const sock = join(orchHome(), "sock");
@@ -18,19 +19,32 @@ const text = (t: string, isError = false) => ({
 server.tool(
   "orch_run",
   "Run a coding task via orch. Routes to Claude Code or Codex and fails over to the other on rate limit or failure.",
-  { prompt: z.string(), cwd: z.string().optional(), context: z.string().optional() },
-  async ({ prompt, cwd, context }) => {
+  {
+    prompt: z.string(),
+    cwd: z.string().optional(),
+    context: z.string().optional(),
+    role: z.string().optional(),
+    roles: z.array(z.string()).optional(),
+    team: z.string().optional(),
+    dryRun: z.boolean().optional(),
+    requireCodex: z.boolean().optional(),
+    keepGoing: z.boolean().optional(),
+  },
+  async ({ prompt, cwd, context, role, roles, team, dryRun, requireCodex, keepGoing }) => {
     await connectOrStart(sock);
     const depth = Number(process.env.ORCH_DEPTH ?? 0) || 0;
     const final = await sendRequest(
       sock,
-      { type: "run", prompt, cwd: resolve(cwd ?? process.cwd()), depth, context },
+      { type: "run", prompt, cwd: resolve(cwd ?? process.cwd()), depth, context, role, roles, team, dryRun, requireCodex, keepGoing },
       () => {},
     );
     if (final.type === "error") return text(final.message, true);
     if (final.type !== "result") return text("unexpected reply from daemon", true);
     const r = final.result;
+    if (r.status === "planned") return text(formatPlan(r));
     const footer = `\n\n[orch] status=${r.status} agent=${r.agent ?? "-"} failedOver=${r.failedOver}${r.usage ? ` tokens=${billableTokens(r.usage)}` : ""}${
+      r.roles ? ` roles=${r.roles.map((x) => `${x.role}:${x.status}`).join(",")}` : ""
+    }${
       r.message ? ` message=${r.message}` : ""
     }`;
     return text(r.output + footer, r.status !== "ok");

@@ -2,12 +2,14 @@ import { chmodSync, existsSync, mkdirSync, statSync, unlinkSync } from "node:fs"
 import net from "node:net";
 import { dirname, isAbsolute } from "node:path";
 import { type Deps, runTask } from "../core/orchestrator.js";
+import { type ReadinessChecker, createReadinessChecker } from "../core/readiness.js";
+import { runRoles } from "../core/team.js";
 import { isAlive } from "./client.js";
 import type { Message, Request } from "./protocol.js";
 
 export interface DaemonOptions {
   sockPath: string;
-  deps: Deps;
+  deps: Deps & { readiness?: ReadinessChecker };
   onShutdown?: () => void;
 }
 
@@ -54,7 +56,32 @@ export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promi
         send({ type: "error", message: `cwd must be an existing absolute directory: ${req.cwd}` });
         return;
       }
+      const wantsRoles = req.role !== undefined || req.roles !== undefined || req.team !== undefined || req.dryRun === true;
       try {
+        if (wantsRoles) {
+          const readiness =
+            deps.readiness ??
+            createReadinessChecker({ config: deps.config, isCooling: (a) => deps.state.isCooling(a, (deps.now ?? Date.now)()) });
+          const result = await runRoles(
+            { ...deps, readiness },
+            {
+              task: req.prompt,
+              cwd: req.cwd,
+              depth: Number(req.depth) || 0,
+              context: typeof req.context === "string" ? req.context : undefined,
+              role: typeof req.role === "string" ? req.role : undefined,
+              roles: Array.isArray(req.roles) ? req.roles.map(String) : undefined,
+              team: typeof req.team === "string" ? req.team : undefined,
+              dryRun: req.dryRun === true,
+              requireCodex: req.requireCodex === true,
+              keepGoing: req.keepGoing === true,
+              signal,
+              onChunk: (text) => send({ type: "chunk", text }),
+            },
+          );
+          send({ type: "result", result });
+          return;
+        }
         const result = await runTask(deps, {
           prompt: req.prompt,
           cwd: req.cwd,

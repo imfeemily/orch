@@ -5,6 +5,7 @@ import { connectOrStart, isAlive, sendRequest } from "../daemon/client.js";
 import { parseArgs } from "./args.js";
 import { Ledger, billableTokens, parseDuration, summarize } from "../core/usage.js";
 import { finalOutputToPrint } from "./render.js";
+import { formatPlan, formatRoles } from "./plan-report.js";
 import { formatUsage } from "./usage-report.js";
 import { USAGE } from "./usage.js";
 
@@ -60,7 +61,7 @@ async function main(): Promise<number> {
       for (const j of m.jobs.slice(-10)) {
         const when = new Date(j.at).toISOString();
         console.log(
-          `${when} ${j.status} ${j.agent ?? "-"}${j.failedOver ? " (failover)" : ""}${j.model ? ` [${j.model}]` : ""}${j.context ? ` <${j.context}>` : ""} ${j.promptPreview}`,
+          `${when} ${j.status} ${j.agent ?? "-"}${j.failedOver ? " (failover)" : ""}${j.model ? ` [${j.model}]` : ""}${j.context ? ` <${j.context}>` : ""}${j.role ? ` {${j.role}}` : ""} ${j.promptPreview}`,
         );
       }
       return 0;
@@ -71,7 +72,19 @@ async function main(): Promise<number> {
       const depth = Number(process.env.ORCH_DEPTH ?? 0) || 0;
       const final = await sendRequest(
         sock,
-        { type: "run", prompt: cmd.prompt, cwd: resolve(cmd.cwd ?? process.cwd()), depth, context: cmd.context },
+        {
+          type: "run",
+          prompt: cmd.prompt,
+          cwd: resolve(cmd.cwd ?? process.cwd()),
+          depth,
+          context: cmd.context,
+          role: cmd.role,
+          roles: cmd.roles,
+          team: cmd.team,
+          dryRun: cmd.dryRun,
+          requireCodex: cmd.requireCodex,
+          keepGoing: cmd.keepGoing,
+        },
         (m) => {
           if (m.type === "chunk") process.stdout.write(m.text);
         },
@@ -79,7 +92,13 @@ async function main(): Promise<number> {
       if (final.type === "error") throw new Error(final.message);
       if (final.type !== "result") throw new Error("unexpected reply from daemon");
       const r = final.result;
+      if (r.status === "planned") {
+        console.log(formatPlan(r));
+        return 0;
+      }
       process.stdout.write(finalOutputToPrint(r.streamed === true, r.output));
+      const roleReport = formatRoles(r);
+      if (roleReport) console.error(roleReport);
       if (r.failedOver) console.error(`\norch: switched agent, finished with ${r.agent}`);
       if (r.status !== "ok") {
         console.error(`orch: ${r.status}${r.message ? `: ${r.message}` : ""}`);

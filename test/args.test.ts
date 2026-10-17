@@ -31,6 +31,24 @@ describe("parseArgs", () => {
     expect(parseArgs(["daemon", "stop"])).toEqual({ name: "daemon", action: "stop" });
   });
 
+  it("parses the role flags for run", () => {
+    expect(parseArgs(["run", "--role", "reviewer", "check", "it"])).toMatchObject({ name: "run", prompt: "check it", role: "reviewer" });
+    expect(parseArgs(["run", "--roles", "developer,tester", "x"])).toMatchObject({ roles: ["developer", "tester"] });
+    expect(parseArgs(["run", "--team", "standard", "--dry-run", "--require-codex", "--keep-going", "x"])).toMatchObject({
+      team: "standard", dryRun: true, requireCodex: true, keepGoing: true,
+    });
+  });
+
+  it("rejects role flags without a value and conflicting selectors", () => {
+    expect(() => parseArgs(["run", "x", "--role"])).toThrow(/--role/);
+    expect(() => parseArgs(["run", "--roles", "", "x"])).toThrow(/--roles/);
+    expect(() => parseArgs(["run", "--role", "a", "--team", "b", "x"])).toThrow(/--role.*--team/);
+  });
+
+  it("accepts --by role for usage", () => {
+    expect(parseArgs(["usage", "--by", "role"])).toEqual({ name: "usage", since: "24h", by: "role" });
+  });
+
   it("parses --context for run", () => {
     expect(parseArgs(["run", "--context", "lean", "fix", "it"])).toEqual({
       name: "run", prompt: "fix it", cwd: undefined, context: "lean",
