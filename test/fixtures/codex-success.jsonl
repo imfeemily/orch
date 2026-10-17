@@ -1,0 +1,4 @@
+{"type":"thread.started","thread_id":"01a1493c-6ca9-73c0-9308-238de2535b7b"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"pong"}}
+{"type":"turn.completed","usage":{"input_tokens":22399,"cached_input_tokens":12544,"cache_write_input_tokens":0,"output_tokens":5,"reasoning_output_tokens":0}}

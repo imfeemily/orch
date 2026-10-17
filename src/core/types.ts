@@ -1,6 +1,26 @@
 export type AgentName = "claude" | "codex";
 export type Outcome = "ok" | "limited" | "auth" | "failed";
 
+/** How to read an agent's stdout: one JSON object, JSON Lines, or plain text. */
+export type OutputKind = "claude-json" | "codex-jsonl" | "text";
+
+/** Token usage of one agent run. `inputTokens` excludes cache reads. */
+export interface Usage {
+  inputTokens: number;
+  cacheReadTokens: number;
+  outputTokens: number;
+  reasoningTokens?: number;
+  costUsd?: number;
+}
+
+export interface AgentOutput {
+  /** the agent's final answer */
+  text: string;
+  /** the error message when the agent reported a failure in its output */
+  errorText?: string;
+  usage?: Usage;
+}
+
 export interface AgentConfig {
   command: string;
   /** argv template; every "{prompt}" substring is replaced by the prompt */
