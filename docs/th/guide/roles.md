@@ -73,16 +73,18 @@ roles:
 
 role ที่มี `needs` จะได้โฟลเดอร์ assets คือ `.orch/runs/<run-id>/assets/` ซึ่ง orch สร้างให้และระบุไว้ท้าย prompt ของ role และสั่งให้บันทึกไฟล์ภาพและ diagram ที่นั่นเท่านั้น เมื่อ role จบ orch จะ **แสดงรายการไฟล์ที่อยู่ในโฟลเดอร์นั้นจริง** (`orch run` พิมพ์ส่วน `assets:` ผล MCP ก็แสดงรายการ) ไม่ได้อ่านชื่อไฟล์จากข้อความของ model ดังนั้น role ที่อ้างถึงไฟล์ที่ไม่ได้เขียนจะถูกรายงานว่าไม่มีไฟล์
 
+`designer` มีสิทธิ์เขียนไฟล์ (พก `-s workspace-write`) เพื่อบันทึกภาพ มีเพียง prompt เท่านั้นที่กันไม่ให้แตะไฟล์โปรเจกต์ จึงควรดู `git status` หลังรัน
+
 diagram แบบข้อความไม่ต้องใช้ Codex: role `architecture` เขียน Mermaid ในบล็อกโค้ดในคำตอบ และถูกบันทึกไปกับ artifact ของ role
 
 ## การเลือกอัตโนมัติ
 
 `orch run --auto "..."` เลือก role ให้ด้วยกฎคำสำคัญธรรมดา ไม่เรียก model จึงไม่เสียโทเค่นในการเลือก เปิดใช้กับทุกการรันด้วย `auto.enabled: true` ใน config และใช้ `--no-auto` เพื่อข้ามในรันเดียว
 
-- **คำถามหรือการอธิบาย** ที่ไม่มีเจตนาเปลี่ยนโค้ด ("explain how...", "what does...") จะไม่เลือก role ใดเลย และรันเป็นการเรียกครั้งเดียว ซึ่งถูกที่สุด
-- งานอื่นเลือก `developer` เสมอ บวก: `tester` เมื่อมี test, bug, fix, regression, feature, implement; `reviewer` เมื่อมี refactor, migrate, implement, feature หรือ prompt ยาว; `security` เมื่อมี auth, login, token, password, secret, crypto, sql, upload, permission, payment; `architecture` เมื่อมี architecture, "design the", module, boundary, "api design", migrate; `designer` เมื่อมี ui, ux, screen, layout, mockup, wireframe, diagram, image, logo จับคู่ทั้งคำ ไม่สนตัวพิมพ์ เพิ่มคำของคุณเองใน `auto.keywords`
+- **คำถามหรือการอธิบาย** จะไม่เลือก role ใดเลย และรันเป็นการเรียกครั้งเดียว ซึ่งถูกที่สุด หมายถึง prompt ที่ลงท้ายด้วยเครื่องหมายคำถาม ขึ้นต้นด้วยคำถาม (explain, what, how is, can, should, ...) โดยไม่มีคำกริยาที่ขอให้เปลี่ยน หรือมีคำถามภาษาไทย (อธิบาย, ทำไม, อย่างไร, ไหม, ...) โดยไม่มีคำที่ขอให้เปลี่ยนแปลง (เพิ่ม, แก้, สร้าง, ...) คำขอสุภาพให้เปลี่ยนบางอย่าง ("can you add...", "please fix...") นับเป็นการเปลี่ยนแปลง
+- งานอื่นเลือก `developer` เสมอ บวก: `tester` เมื่อมี test, bug, fix, regression, feature, implement; `reviewer` เมื่อมี refactor, migrate, implement, feature หรือ prompt ยาว; `security` เมื่อมี auth, login, token, password, secret, crypto, sql, upload, permission, payment; `architecture` เมื่อมี architecture, "design the", module, boundary, "api design", migrate; `designer` เมื่อมี ui, ux, screen, layout, mockup, wireframe, diagram, image, logo จับคู่ทั้งคำ ไม่สนตัวพิมพ์ และรับคำลงท้ายทั่วไป (tests, fixing, migrated, boundaries) เพิ่มคำของคุณเองใน `auto.keywords` role ที่คุณสร้างเองก็ใส่คำได้ที่นั่นและจะถูกเลือกเป็นลำดับสุดท้าย
 - รันไม่เกิน `auto.maxRoles` role (ค่าเริ่มต้น 3) ถ้าตรงมากกว่านั้นจะเก็บตามลำดับ `developer`, `security`, `tester`, `reviewer`, `architecture`, `designer` และแสดงตัวที่ถูกตัด role ที่เลือกรันตามลำดับมาตรฐาน
-- ลำดับความสำคัญ: `--role`, `--roles` หรือ `--team` ชนะ `--auto` ถ้าใช้ร่วมกันจะ error ส่วน `--auto` ชนะ `auto.enabled`
+- `--auto` ใช้ร่วมกับ `--role`, `--roles` หรือ `--team` ไม่ได้ (error) เมื่อ `auto.enabled: true` การระบุ `--role`, `--roles` หรือ `--team` เองจะชนะในรันนั้น และ `--no-auto` ปิด auto ในรันนั้น
 
 ```bash
 orch explain "implement login with a password reset token"   # เลือก role อะไร เพราะอะไร ไม่เรียก model
@@ -90,7 +92,7 @@ orch run --auto --dry-run "implement login with a password reset token"
 orch run --auto "fix the typo in README"
 ```
 
-การรันแบบ auto จริงพิมพ์หนึ่งบรรทัดก่อนเริ่ม role: `auto: roles developer, tester` พร้อมเหตุผล
+การรันแบบ auto จริงพิมพ์การเลือก (`auto: roles developer, tester`) และเหตุผลที่ stderr หลังคำตอบ ผ่าน MCP ท้ายผลลัพธ์จะมี `auto=` และ `dropped=` เมื่อมี role ที่ถูกตัดเพราะขีดจำกัด
 
 ## วางแผนก่อนด้วย `--dry-run`
 

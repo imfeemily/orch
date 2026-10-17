@@ -73,16 +73,18 @@ If you pass a [context preset](/guide/configuration#context-presets) that turns 
 
 A role with `needs` gets an assets directory, `.orch/runs/<run-id>/assets/`, which orch creates and names at the end of the role's prompt. The role is told to save image and diagram files there and nowhere else. After the role finishes, orch **lists the files that are actually in that directory** and reports them (`orch run` prints an `assets:` section; the MCP result lists them). It does not read file names out of the model's text, so a role that claims a file it did not write is reported as having no files.
 
+The `designer` is allowed to write files (it carries `-s workspace-write`) so that it can save images; only its prompt keeps it out of your project files, so look at `git status` after running it.
+
 Text diagrams do not need Codex: the `architecture` role writes Mermaid in a fenced block in its answer, and that is saved with the role's artifact.
 
 ## Automatic selection
 
 `orch run --auto "..."` picks the roles for you with plain keyword rules; it never calls a model, so choosing costs nothing. Turn it on for every run with `auto.enabled: true` in the config, and use `--no-auto` to skip it for one run.
 
-- A **question or explanation** with no change intent ("explain how...", "what does...") selects **no roles** and runs as one plain call, the cheapest path.
-- Any other task selects `developer`, plus: `tester` for test, bug, fix, regression, feature, implement; `reviewer` for refactor, migrate, implement, feature, or a long prompt; `security` for auth, login, token, password, secret, crypto, sql, upload, permission, payment; `architecture` for architecture, "design the", module, boundary, "api design", migrate; `designer` for ui, ux, screen, layout, mockup, wireframe, diagram, image, logo. Words match whole words, ignoring case. Add your own words under `auto.keywords`.
+- A **question or explanation** selects **no roles** and runs as one plain call, the cheapest path. That means a prompt ending in a question mark, one that starts with a question word (explain, what, how is, can, should, ...) and has no change verb, or one with a Thai question marker (อธิบาย, ทำไม, อย่างไร, ไหม, ...) and no Thai change word (เพิ่ม, แก้, สร้าง, ...). A polite request to change something ("can you add...", "please fix...") counts as a change.
+- Any other task selects `developer`, plus: `tester` for test, bug, fix, regression, feature, implement; `reviewer` for refactor, migrate, implement, feature, or a long prompt; `security` for auth, login, token, password, secret, crypto, sql, upload, permission, payment; `architecture` for architecture, "design the", module, boundary, "api design", migrate; `designer` for ui, ux, screen, layout, mockup, wireframe, diagram, image, logo. Words match whole words, ignoring case, with common endings (tests, fixing, migrated, boundaries). Add your own words under `auto.keywords`; a role you defined yourself can have words there too and is selected last.
 - At most `auto.maxRoles` roles run (default 3). When more match, `developer`, `security`, `tester`, `reviewer`, `architecture`, `designer` are kept in that priority, and the ones cut are listed. Selected roles run in the canonical order.
-- Precedence: `--role`, `--roles` or `--team` beat `--auto`; combining them is an error. `--auto` beats `auto.enabled`.
+- `--auto` cannot be combined with `--role`, `--roles` or `--team` (an error). With `auto.enabled: true`, an explicit `--role`, `--roles` or `--team` wins for that run, and `--no-auto` turns auto off for it.
 
 ```bash
 orch explain "implement login with a password reset token"   # which roles, and why; no model call
@@ -90,7 +92,7 @@ orch run --auto --dry-run "implement login with a password reset token"
 orch run --auto "fix the typo in README"
 ```
 
-A real auto run prints one line before the roles: `auto: roles developer, tester` with the reasons.
+A real auto run prints the selection (`auto: roles developer, tester`) and the reasons on stderr, after the answer. Over MCP the result footer lists `auto=` and, when the limit cut some, `dropped=`.
 
 ## Plan first with `--dry-run`
 

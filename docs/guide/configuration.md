@@ -139,7 +139,7 @@ Keys of `auto`: `enabled`, `maxRoles`, `keywords`.
 
 - `auto.enabled`: when true, a plain `orch run` selects roles from the prompt; `--no-auto` turns it off for one run. Default false.
 - `auto.maxRoles`: a positive integer, default 3.
-- `auto.keywords`: role name to extra words (lists of strings). Unknown role names are rejected at load.
+- `auto.keywords`: role name to extra words (lists of strings), for built-in roles and for roles you defined yourself (those are selected last). Unknown role names are rejected at load, and so are an `auto` block that is not a mapping and unknown keys.
 
 ## Environment variables
 
