@@ -1,0 +1,67 @@
+{
+  "meta": {
+    "date": "2026-10-17",
+    "node": "v24.16.0",
+    "claude": "2.1.231 (Claude Code)",
+    "codex": "codex-cli 0.162.1",
+    "platform": "darwin"
+  },
+  "records": [
+    {
+      "id": "F-T2-plain",
+      "experiment": "F",
+      "task": "write a small test",
+      "variant": "one plain call through orch",
+      "agent": "claude",
+      "models": [
+        "(default)"
+      ],
+      "usage": {
+        "inputTokens": 41218,
+        "cacheReadTokens": 97583,
+        "outputTokens": 1101,
+        "costUsd": 0.2930799
+      },
+      "billableTokens": 42319,
+      "costUsd": 0.2930799,
+      "durationMs": 20319,
+      "success": true,
+      "answerPreview": "Created `test/math.test.ts` with 3 tests for `add()` and 5 for `clamp()` (including boundary cases at min/max). Not run, per your instruction.\n\nNext: run `npx v"
+    },
+    {
+      "id": "F-T2-standard-team",
+      "experiment": "F",
+      "task": "write a small test",
+      "variant": "orch --team standard (developer, tester, reviewer)",
+      "agent": "claude",
+      "models": [
+        "(default)"
+      ],
+      "usage": {
+        "inputTokens": 102444,
+        "cacheReadTokens": 445391,
+        "outputTokens": 3976,
+        "costUsd": 0.8078372999999999
+      },
+      "billableTokens": 106420,
+      "costUsd": 0.8078372999999999,
+      "durationMs": 74297,
+      "success": true,
+      "answerPreview": "## developer\nCreated `test/math.test.ts` with 8 cases: add (positive, negative, zero) and clamp (in-range, below-min, above-max, min boundary, max boundary). No",
+      "perRole": {
+        "developer": {
+          "billableTokens": 42744,
+          "costUsd": 0.2973318
+        },
+        "tester": {
+          "billableTokens": 41688,
+          "costUsd": 0.2698005
+        },
+        "reviewer": {
+          "billableTokens": 21988,
+          "costUsd": 0.240705
+        }
+      }
+    }
+  ]
+}

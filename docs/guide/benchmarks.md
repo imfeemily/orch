@@ -1,6 +1,6 @@
 # Benchmarks: where orch saves tokens
 
-These are real runs of the real `claude` and `codex` on one machine, measured on 2026-10-17. They show **which orch features reduce cost, by how much, and which do not**. Raw data is in `benchmarks/results-2026-10-17.json` and `benchmarks/results-2026-10-17-handoff-repeat.json` and `benchmarks/results-2026-10-17-context.json`; the harness is `scripts/benchmark.ts`.
+These are real runs of the real `claude` and `codex` on one machine, measured on 2026-10-17. They show **which orch features reduce cost, by how much, and which do not**. Raw data is in `benchmarks/results-2026-10-17.json` and `benchmarks/results-2026-10-17-handoff-repeat.json` `benchmarks/results-2026-10-17-context.json` and `benchmarks/results-2026-10-17-roles.json`; the harness is `scripts/benchmark.ts`.
 
 ::: warning Read the limits first
 Few runs, one machine, one small repository, three small tasks. Treat the numbers as a direction, not statistics. Identical runs differ a lot (see [Noise](#noise-the-same-task-varied-by-38)), so only differences much bigger than about 40% mean something.
@@ -15,6 +15,7 @@ Few runs, one machine, one small repository, three small tasks. Treat the number
 | **Skipping the summary call** after a limit or login failure | Saves time, **not tokens** (a call to a limited agent should fail immediately; not measured) | Reasoning only |
 | orch itself | **No measurable overhead** (+0.7% tokens, +5.8% cost, within noise); orch makes no LLM calls of its own | Good |
 | **Context presets** (`--context lean`): skip user-level hooks, plugins and skills | **-48% cost** across the same 3 tasks with the default model (-41% against every default run in this study), all correct; Codex **-18% input per call** | Medium: consistent direction, but one run per task and about ±30% noise |
+| **Roles** (`--team standard`: developer, tester, reviewer) | **Costs more, by design:** 2.5x the tokens, 2.8x the cost and 3.7x the time of one plain call on a small task; all three roles succeeded | Medium: one task, one run |
 | **Fixed context per call** if you do nothing | Not reduced by default: 44% to 86% of the cost of a small task. `--safe-mode` (preset `minimal`) cuts a one-word call by 68% but also drops project instructions | Good |
 
 The key point: **orch saves money mainly by choosing a cheaper model for small tasks, not by sending fewer tokens.** Token counts barely moved (-27%), cost fell by three quarters because a token on `haiku` is much cheaper than a token on `sonnet`.
@@ -117,13 +118,30 @@ The same three tasks with the default model, through orch, with the default cont
 
 What `lean` gives up: user-level settings, hooks, plugins and personal instructions. These tasks did not depend on any of them. Check your own: if a task needs a user-level permission or hook, put it in the agent's `args` or the project's settings.
 
+## Experiment F: roles
+
+The "write a small test" task as one plain call and as `orch run --team standard` (developer, tester, reviewer, each a separate call with the built-in role prompts and permission flags).
+
+| Run | Tokens | Cost | Time | Correct |
+|---|---|---|---|---|
+| One plain call | 42,319 | $0.2931 | 20 s | yes |
+| `--team standard` | 106,420 | $0.8078 | 74 s | yes (all three roles succeeded) |
+| **Team vs plain** | **2.5x** | **2.8x** | **3.7x** | |
+
+Per role: developer 42,744 tokens ($0.2973), tester 41,688 ($0.2698), reviewer 21,988 ($0.2407). The reviewer used the `lean` context, but it was the first call with those flags in this run, so its cache was cold and its cost is higher than a warm `lean` call would be.
+
+What the extra calls bought: the reviewer checked the generated test against the implementation, including the boundary cases of `clamp` (strict `<` and `>`), found no bugs, and noted that the project had no `vitest` dependency, so running the tests would need a download. Each role's full answer was saved under `.orch/runs/<run-id>/` (with a `.gitignore` of `*`).
+
+**Reading it honestly.** On a task this small, three roles cost about three times one call and mostly confirm what one call already did. Roles earn their cost on changes that deserve a second look: larger edits, risky areas, code you will not read line by line. For small edits, use one call (and a model and context preset from the experiments above). One run of one task: treat the multiple as a rough guide.
+
 ## What to do with this
 
 1. **Add model rules for small tasks.** This is the saving that measured clearly. Start with typo, rename, explain and small-test rules (see [Configuration](/guide/configuration)), check `orch usage --by model`, and widen only if results stay correct.
 2. **Leave the handoff defaults.** They help most when a failover happens with a large uncommitted change.
 3. **Consider removing `summaryArgs`** if failovers after plain failures are frequent and cost matters more than the extra context.
 4. **Use a context preset for small tasks.** Add `context: lean` to your small-task rules next to the model rule (Experiment E). Heavy user-level hooks, plugins and skills are loaded into every call orch makes for you; `lean` skips them while keeping the project's own instructions.
-5. **Do not trust single runs.** Use `orch usage` over days, not one comparison.
+5. **Use roles for changes worth a second look**, not for small edits: a three-role team cost about 2.8 times one call here. Start with `--dry-run` to see the number of calls, and `orch usage --by role` to see where the cost went.
+6. **Do not trust single runs.** Use `orch usage` over days, not one comparison.
 
 ## Limits of this study
 
@@ -140,6 +158,7 @@ npm run build
 npm run benchmark                                  # all experiments, real tokens, a few dollars
 npm run benchmark -- --only A,B                    # a subset
 npm run benchmark -- --only E                      # context presets
+npm run benchmark -- --only F                      # roles: one call against a team
 npm run benchmark -- --only C --c-repeats 4 --skip-summary --out benchmarks/my-run.json
 ```
 

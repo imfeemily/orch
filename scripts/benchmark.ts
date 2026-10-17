@@ -6,6 +6,7 @@
  *
  * A: model routing   B: orch overhead   C: handoff cost   D: fixed context per call
  * E: context presets (`--context lean`) against the default context
+ * F: roles: one plain call against `--team standard` on the same task
  * Everything runs in temporary copies of a small seeded repository.
  */
 import { spawnSync } from "node:child_process";
@@ -22,7 +23,7 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const CLI = join(ROOT, "dist/cli/index.js");
 const args = process.argv.slice(2);
 const flag = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
-const only = new Set((flag("--only") ?? "A,B,C,D,E").split(","));
+const only = new Set((flag("--only") ?? "A,B,C,D,E,F").split(","));
 const date = new Date().toISOString().slice(0, 10);
 const C_REPEATS = Number(flag("--c-repeats") ?? 1);
 const SKIP_SUMMARY = args.includes("--skip-summary");
@@ -30,7 +31,7 @@ const OUT = resolve(flag("--out") ?? join(ROOT, `benchmarks/results-${date}.json
 
 interface RunRecord {
   id: string;
-  experiment: "A" | "B" | "C" | "D" | "E";
+  experiment: "A" | "B" | "C" | "D" | "E" | "F";
   task: string;
   variant: string;
   agent: "claude" | "codex";
@@ -43,6 +44,8 @@ interface RunRecord {
   promptChars?: number;
   note?: string;
   answerPreview?: string;
+  /** tokens and cost per role, for team runs */
+  perRole?: Record<string, { billableTokens: number; costUsd: number }>;
 }
 
 const records: RunRecord[] = [];
@@ -105,6 +108,8 @@ interface Measured {
   durationMs: number;
   text: string;
   error?: string;
+  stderr?: string;
+  entries?: Array<{ role?: string; usage?: Usage }>;
 }
 
 function claudeDirect(cwd: string, prompt: string, extra: string[] = [], head: string[] = []): Measured {
@@ -154,7 +159,10 @@ function viaOrch(cwd: string, prompt: string, configYaml: string, extraCli: stri
       )
     : undefined;
   const models = [...new Set(entries.map((e: { model?: string }) => e.model ?? "(default)"))] as string[];
-  return { usage, costUsd: usage?.costUsd, models, durationMs, text: r.stdout ?? "", error: r.status ? (r.stderr ?? "").slice(0, 200) : undefined };
+  return {
+    usage, costUsd: usage?.costUsd, models, durationMs, text: r.stdout ?? "",
+    error: r.status ? (r.stderr ?? "").slice(0, 200) : undefined, stderr: r.stderr ?? "", entries,
+  };
 }
 
 function record(id: string, experiment: RunRecord["experiment"], task: string, variant: string, agent: RunRecord["agent"], m: Measured, success: boolean | null, extra: Partial<RunRecord> = {}) {
@@ -335,11 +343,40 @@ function expE() {
   }
 }
 
+function perRole(entries: Measured["entries"]): RunRecord["perRole"] {
+  const out: NonNullable<RunRecord["perRole"]> = {};
+  for (const e of entries ?? []) {
+    const key = e.role ?? "(none)";
+    const row = out[key] ?? { billableTokens: 0, costUsd: 0 };
+    if (e.usage) {
+      row.billableTokens += billableTokens(e.usage);
+      row.costUsd += e.usage.costUsd ?? 0;
+    }
+    out[key] = row;
+  }
+  return out;
+}
+
+/** The "write a small test" task as one plain call and as the standard team (developer, tester, reviewer). */
+function expF() {
+  const t = TASKS.T2;
+  const plainDir = freshRepo("F-plain");
+  const plain = viaOrch(plainDir, t.prompt, ORCH_DEFAULT);
+  record("F-T2-plain", "F", t.name, "one plain call through orch", "claude", plain, t.check(plainDir, plain.text));
+
+  const teamDir = freshRepo("F-team");
+  const team = viaOrch(teamDir, t.prompt, "", ["--team", "standard"]);
+  const allOk = ["developer ok", "tester ok", "reviewer ok"].every((s) => (team.stderr ?? "").includes(s));
+  record("F-T2-standard-team", "F", t.name, "orch --team standard (developer, tester, reviewer)", "claude", team, t.check(teamDir, team.text) && allOk, {
+    perRole: perRole(team.entries),
+  });
+}
+
 async function main() {
   if (!existsSync(CLI)) throw new Error("dist/ is missing: run `npm run build` first");
   console.log(`Benchmark: spends real tokens. Experiments: ${[...only].join(", ")}. Output: ${OUT}`);
   seedRepo();
-  const steps: Array<[string, () => void | Promise<void>]> = [["A", expA], ["B", expB], ["C", expC], ["D", expD], ["E", expE]];
+  const steps: Array<[string, () => void | Promise<void>]> = [["A", expA], ["B", expB], ["C", expC], ["D", expD], ["E", expE], ["F", expF]];
   for (const [name, fn] of steps) {
     if (!only.has(name)) continue;
     console.log(`\n== Experiment ${name}`);
