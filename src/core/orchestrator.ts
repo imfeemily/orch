@@ -7,7 +7,7 @@ import { parseResetTime } from "./reset.js";
 import { type Route, otherAgent, pickRoleRoute, pickRoute } from "./router.js";
 import type { StateStore } from "./state.js";
 import type { AgentName, Attempt, Config, RunFn, TaskResult } from "./types.js";
-import type { Ledger } from "./usage.js";
+import { type Ledger, sumUsage } from "./usage.js";
 
 export interface Deps {
   config: Config;
@@ -201,7 +201,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       outcome,
       ...(parsed.usage ? { usage: parsed.usage } : {}),
       durationMs: now() - startedAt,
-      promptChars: req.prompt.length,
+      promptChars: prompt.length,
     });
     const streamed = cfg.output === "text" && req.onChunk !== undefined;
     return { text: parsed.text, detail: parsed.errorText ?? result.stderr, outcome, attempt, streamed };
@@ -215,7 +215,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       output: a1.text,
       failedOver: false,
       attempts: [a1.attempt],
-      usage: a1.attempt.usage,
+      usage: sumUsage([a1.attempt.usage]),
       streamed: a1.streamed,
     });
   }
@@ -280,7 +280,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     output: a2.text,
     failedOver: true,
     attempts: [a1.attempt, a2.attempt],
-    usage: a2.attempt.usage,
+    usage: sumUsage([a1.attempt.usage, a2.attempt.usage]),
     streamed: a2.streamed,
     message:
       a2.outcome === "ok"

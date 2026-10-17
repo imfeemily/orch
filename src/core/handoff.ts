@@ -13,6 +13,8 @@ export interface HandoffInput {
   previousAgent: AgentName;
   reason: "limited" | "auth" | "failed";
   summary?: string;
+  /** runs git with these arguments and returns stdout, or null on failure (injectable for tests) */
+  git?: (args: string[]) => Promise<string | null>;
 }
 
 async function git(cwd: string, args: string[]): Promise<string | null> {
@@ -26,8 +28,9 @@ async function git(cwd: string, args: string[]): Promise<string | null> {
 
 export async function buildHandoff(input: HandoffInput): Promise<string> {
   const { prompt, cwd, previousAgent, reason, summary } = input;
-  const status = await git(cwd, ["status", "--short"]);
-  const diff = (await git(cwd, ["diff", "HEAD"])) ?? (await git(cwd, ["diff"])) ?? "";
+  const runGit = input.git ?? ((args: string[]) => git(cwd, args));
+  const status = await runGit(["status", "--short"]);
+  const diff = (await runGit(["diff", "HEAD"])) ?? (await runGit(["diff"]));
 
   const why =
     reason === "limited" ? "hit a usage/rate limit" : reason === "auth" ? "could not authenticate" : "failed";
@@ -42,12 +45,14 @@ export async function buildHandoff(input: HandoffInput): Promise<string> {
     );
   } else {
     parts.push(`## Working tree status\n${status.trim() === "" ? "(clean)" : status.trimEnd()}`);
-    if (diff.trim() === "") {
+    if (diff === null) {
+      parts.push("## Diff so far\n(diff unavailable: run `git diff` to inspect the changes)");
+    } else if (diff.trim() === "") {
       parts.push("## Diff so far\n(no changes)");
     } else if (diff.length <= INLINE_DIFF_MAX_CHARS) {
       parts.push(`## Diff so far\n${diff}`);
     } else {
-      const stat = (await git(cwd, ["diff", "HEAD", "--stat"])) ?? (await git(cwd, ["diff", "--stat"])) ?? "";
+      const stat = (await runGit(["diff", "HEAD", "--stat"])) ?? (await runGit(["diff", "--stat"])) ?? "";
       parts.push(
         `## Changes so far (diff too large to inline: ${diff.length} chars)\n${stat.trimEnd()}\n\nRun \`git diff\` to inspect the changes.`,
       );

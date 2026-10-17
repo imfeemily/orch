@@ -116,6 +116,20 @@ describe("chunks and ledger", () => {
     expect(entries[0].taskId).toBe(entries[1].taskId);
   });
 
+  it("reports the usage of every attempt, and records each attempt's own prompt size", async () => {
+    const limited = JSON.stringify({ is_error: true, result: "You've hit your usage limit.", usage: { input_tokens: 5, output_tokens: 7 } });
+    const codexOk =
+      '{"type":"item.completed","item":{"type":"agent_message","text":"from codex"}}\n' +
+      '{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":0,"output_tokens":20}}\n';
+    const s = setup({ claude: exit1(limited), codex: { exitCode: 0, stdout: codexOk, stderr: "" } });
+    const r = await go(s);
+    expect(r.usage).toMatchObject({ inputTokens: 105, outputTokens: 27 });
+    const [first, second] = s.ledger.readSince(0);
+    expect(first.promptChars).toBe("build a page".length);
+    expect(second.promptChars).toBe(s.calls[1].prompt.length);
+    expect(second.promptChars).toBeGreaterThan(first.promptChars);
+  });
+
   it("works without a ledger and with an unwritable one", async () => {
     const s = setup({ claude: { exitCode: 0, stdout: "ok", stderr: "" } });
     const noLedger = await runTask({ ...s.deps, ledger: undefined }, { prompt: "p", cwd: s.cwd, depth: 0 });

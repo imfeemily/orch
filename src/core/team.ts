@@ -6,7 +6,8 @@ import { type ReadinessChecker, contextBlocks } from "./readiness.js";
 import { type Handoff, type RoleSelection, buildRolePrompt, capHandoffs, extractHandoff, planRoles } from "./roles.js";
 import { pickRoleRoute } from "./router.js";
 import { selectRoles } from "./select-roles.js";
-import type { AgentName, Config, PlanStep, RoleResult, TaskResult, Usage } from "./types.js";
+import type { AgentName, Config, PlanStep, RoleResult, TaskResult } from "./types.js";
+import { sumUsage } from "./usage.js";
 
 export interface TeamDeps extends Deps {
   readiness: ReadinessChecker;
@@ -65,20 +66,6 @@ const rejected = (message: string): TaskResult => ({
   attempts: [],
   message,
 });
-
-function sumUsage(usages: Array<Usage | undefined>): Usage | undefined {
-  const present = usages.filter((u): u is Usage => u !== undefined);
-  if (present.length === 0) return undefined;
-  return present.reduce<Usage>(
-    (a, u) => ({
-      inputTokens: a.inputTokens + u.inputTokens,
-      cacheReadTokens: a.cacheReadTokens + u.cacheReadTokens,
-      outputTokens: a.outputTokens + u.outputTokens,
-      ...(a.costUsd !== undefined || u.costUsd !== undefined ? { costUsd: (a.costUsd ?? 0) + (u.costUsd ?? 0) } : {}),
-    }),
-    { inputTokens: 0, cacheReadTokens: 0, outputTokens: 0 },
-  );
-}
 
 /** The assets directory of a run, created by orch for roles that need a capability. */
 function prepareAssets(cwd: string, runId: string, needed: boolean): { rel: string; abs: string } | undefined {

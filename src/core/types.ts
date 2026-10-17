@@ -142,7 +142,7 @@ export interface TaskResult {
   plan?: PlanStep[];
   /** true when the final answer was already forwarded through onChunk */
   streamed?: boolean;
-  /** token usage of the final attempt, when the agent reported it */
+  /** token usage of all attempts of the task (a failover adds the second), when agents reported it */
   usage?: Usage;
   message?: string;
 }

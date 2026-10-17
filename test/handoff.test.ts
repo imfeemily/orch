@@ -32,6 +32,14 @@ describe("buildHandoff", () => {
     expect(out).toContain("+two");
   });
 
+  it("says the diff is unavailable instead of claiming there are no changes when git cannot produce it", async () => {
+    const fake = async (args: string[]) => (args[0] === "status" ? " M big.bin\n" : null);
+    const out = await buildHandoff({ prompt: "p", cwd: "/x", previousAgent: "claude", reason: "failed", git: fake });
+    expect(out).toContain("M big.bin");
+    expect(out).toContain("diff unavailable");
+    expect(out).not.toContain("(no changes)");
+  });
+
   it("works outside a git repo", async () => {
     const dir = mkdtempSync(join(tmpdir(), "orch-nogit-"));
     const out = await buildHandoff({ prompt: "p", cwd: dir, previousAgent: "codex", reason: "failed" });
