@@ -1,0 +1,346 @@
+{
+  "meta": {
+    "date": "2026-10-17",
+    "node": "v24.16.0",
+    "claude": "2.1.231 (Claude Code)",
+    "codex": "codex-cli 0.162.1",
+    "platform": "darwin"
+  },
+  "records": [
+    {
+      "id": "A-T1-base",
+      "experiment": "A",
+      "task": "fix a typo",
+      "variant": "claude default model, run directly",
+      "agent": "claude",
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "usage": {
+        "inputTokens": 66164,
+        "cacheReadTokens": 71563,
+        "outputTokens": 384,
+        "costUsd": 0.42419490000000004
+      },
+      "billableTokens": 66548,
+      "costUsd": 0.42419490000000004,
+      "durationMs": 14297,
+      "success": true,
+      "answerPreview": "Done. Line 3: `recieve` \u2192 `receive`."
+    },
+    {
+      "id": "A-T1-fast",
+      "experiment": "A",
+      "task": "fix a typo",
+      "variant": "orch rule: haiku + low effort",
+      "agent": "claude",
+      "models": [
+        "haiku"
+      ],
+      "usage": {
+        "inputTokens": 43346,
+        "cacheReadTokens": 50397,
+        "outputTokens": 481,
+        "costUsd": 0.09411069999999999
+      },
+      "billableTokens": 43827,
+      "costUsd": 0.09411069999999999,
+      "durationMs": 10079,
+      "success": true,
+      "answerPreview": "Fixed: changed \"recieve\" to \"receive\" on line 3.\n"
+    },
+    {
+      "id": "A-T2-base",
+      "experiment": "A",
+      "task": "write a small test",
+      "variant": "claude default model, run directly",
+      "agent": "claude",
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "usage": {
+        "inputTokens": 41143,
+        "cacheReadTokens": 97499,
+        "outputTokens": 970,
+        "costUsd": 0.2906397
+      },
+      "billableTokens": 42113,
+      "costUsd": 0.2906397,
+      "durationMs": 17577,
+      "success": true,
+      "answerPreview": "Created `test/math.test.ts` with 7 tests covering `add()` and `clamp()`. Not run, per your instructions."
+    },
+    {
+      "id": "A-T2-fast",
+      "experiment": "A",
+      "task": "write a small test",
+      "variant": "orch rule: haiku + low effort",
+      "agent": "claude",
+      "models": [
+        "haiku"
+      ],
+      "usage": {
+        "inputTokens": 24854,
+        "cacheReadTokens": 69694,
+        "outputTokens": 1211,
+        "costUsd": 0.0627064
+      },
+      "billableTokens": 26065,
+      "costUsd": 0.0627064,
+      "durationMs": 17624,
+      "success": true,
+      "answerPreview": "Done. Test file created at `test/math.test.ts` with 13 tests covering `add()` and `clamp()` across normal cases, edge cases, and boundary conditions.\n"
+    },
+    {
+      "id": "A-T3-base",
+      "experiment": "A",
+      "task": "explain code",
+      "variant": "claude default model, run directly",
+      "agent": "claude",
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "usage": {
+        "inputTokens": 20711,
+        "cacheReadTokens": 71718,
+        "outputTokens": 312,
+        "costUsd": 0.1504494
+      },
+      "billableTokens": 21023,
+      "costUsd": 0.1504494,
+      "durationMs": 11011,
+      "success": true,
+      "answerPreview": "`clamp(value, min, max)` restricts `value` to the `[min, max]` range. It returns `min` whenever `value < min`; otherwise it returns `max` if `value > max`, or `",
+      "regraded": "automatic check was a false negative (answer uses '<'); answer verified correct by reading"
+    },
+    {
+      "id": "A-T3-fast",
+      "experiment": "A",
+      "task": "explain code",
+      "variant": "orch rule: haiku + low effort",
+      "agent": "claude",
+      "models": [
+        "haiku"
+      ],
+      "usage": {
+        "inputTokens": 23962,
+        "cacheReadTokens": 37792,
+        "outputTokens": 407,
+        "costUsd": 0.053720199999999996
+      },
+      "billableTokens": 24369,
+      "costUsd": 0.053720199999999996,
+      "durationMs": 9004,
+      "success": true,
+      "answerPreview": "`clamp()` constrains a number to stay within a specified range: it returns the lower bound when the input is below the minimum, the upper bound when above the m"
+    },
+    {
+      "id": "B-T1-base-repeat",
+      "experiment": "B",
+      "task": "fix a typo",
+      "variant": "claude default model, run directly (repeat)",
+      "agent": "claude",
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "usage": {
+        "inputTokens": 40663,
+        "cacheReadTokens": 143986,
+        "outputTokens": 537,
+        "costUsd": 0.2952048
+      },
+      "billableTokens": 41200,
+      "costUsd": 0.2952048,
+      "durationMs": 13699,
+      "success": true,
+      "answerPreview": "Fixed: \"recieve\" \u2192 \"receive\" (README.md:3)."
+    },
+    {
+      "id": "B-T1-orch-default",
+      "experiment": "B",
+      "task": "fix a typo",
+      "variant": "same model, through orch (no rule)",
+      "agent": "claude",
+      "models": [
+        "(default)"
+      ],
+      "usage": {
+        "inputTokens": 40826,
+        "cacheReadTokens": 190907,
+        "outputTokens": 666,
+        "costUsd": 0.3121881000000001
+      },
+      "billableTokens": 41492,
+      "costUsd": 0.3121881000000001,
+      "durationMs": 16588,
+      "success": true,
+      "answerPreview": "Fixed: \"recieve\" \u2192 \"receive\" in README.md line 3.\n"
+    },
+    {
+      "id": "C-summary-call",
+      "experiment": "C",
+      "task": "handoff summary call",
+      "variant": "claude -c -p resumes the previous session (old handoff only)",
+      "agent": "claude",
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "usage": {
+        "inputTokens": 22735,
+        "cacheReadTokens": 24929,
+        "outputTokens": 144,
+        "costUsd": 0.1460427
+      },
+      "billableTokens": 22879,
+      "costUsd": 0.1460427,
+      "durationMs": 6522,
+      "success": null,
+      "answerPreview": "Done: created `test/math.test.ts` with 7 tests \u2014 3 for `add()` (positive, negative, zero), 4 for `clamp()` (in-range, below min, above max, boundary values).\n\nR"
+    },
+    {
+      "id": "C-codex-old-handoff",
+      "experiment": "C",
+      "task": "receiving agent continues after failover",
+      "variant": "old handoff: diff up to 20,000 chars + summary",
+      "agent": "codex",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "inputTokens": 17193,
+        "cacheReadTokens": 41856,
+        "outputTokens": 82,
+        "reasoningTokens": 0
+      },
+      "billableTokens": 17275,
+      "durationMs": 10430,
+      "success": true,
+      "answerPreview": "1",
+      "promptChars": 20868
+    },
+    {
+      "id": "C-codex-new-handoff",
+      "experiment": "C",
+      "task": "receiving agent continues after failover",
+      "variant": "new handoff: git diff --stat, no summary",
+      "agent": "codex",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "inputTokens": 23668,
+        "cacheReadTokens": 33792,
+        "outputTokens": 91,
+        "reasoningTokens": 0
+      },
+      "billableTokens": 23759,
+      "durationMs": 6442,
+      "success": true,
+      "answerPreview": "1",
+      "promptChars": 614
+    },
+    {
+      "id": "D-claude-default",
+      "experiment": "D",
+      "task": "one-word answer",
+      "variant": "claude, default context",
+      "agent": "claude",
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "usage": {
+        "inputTokens": 20377,
+        "cacheReadTokens": 25656,
+        "outputTokens": 4,
+        "costUsd": 0.13001279999999998
+      },
+      "billableTokens": 20381,
+      "costUsd": 0.13001279999999998,
+      "durationMs": 5755,
+      "success": true,
+      "answerPreview": "pong"
+    },
+    {
+      "id": "D-claude-bare",
+      "experiment": "D",
+      "task": "one-word answer",
+      "variant": "claude --bare",
+      "agent": "claude",
+      "models": [],
+      "usage": {
+        "inputTokens": 0,
+        "cacheReadTokens": 0,
+        "outputTokens": 0,
+        "costUsd": 0
+      },
+      "billableTokens": 0,
+      "costUsd": 0,
+      "durationMs": 772,
+      "success": false,
+      "note": "Not logged in \u00b7 Please run /login",
+      "answerPreview": "Not logged in \u00b7 Please run /login"
+    },
+    {
+      "id": "D-claude-safe",
+      "experiment": "D",
+      "task": "one-word answer",
+      "variant": "claude --safe-mode",
+      "agent": "claude",
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "usage": {
+        "inputTokens": 5607,
+        "cacheReadTokens": 24929,
+        "outputTokens": 4,
+        "costUsd": 0.0411747
+      },
+      "billableTokens": 5611,
+      "costUsd": 0.0411747,
+      "durationMs": 4139,
+      "success": true,
+      "answerPreview": "pong"
+    },
+    {
+      "id": "D-claude-no-skills",
+      "experiment": "D",
+      "task": "one-word answer",
+      "variant": "claude --disable-slash-commands",
+      "agent": "claude",
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "usage": {
+        "inputTokens": 36157,
+        "cacheReadTokens": 0,
+        "outputTokens": 4,
+        "costUsd": 0.21699600000000002
+      },
+      "billableTokens": 36161,
+      "costUsd": 0.21699600000000002,
+      "durationMs": 5076,
+      "success": true,
+      "answerPreview": "pong"
+    },
+    {
+      "id": "D-codex-default",
+      "experiment": "D",
+      "task": "one-word answer",
+      "variant": "codex, default context",
+      "agent": "codex",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "inputTokens": 9510,
+        "cacheReadTokens": 12544,
+        "outputTokens": 5,
+        "reasoningTokens": 0
+      },
+      "billableTokens": 9515,
+      "durationMs": 4825,
+      "success": true,
+      "answerPreview": "pong"
+    }
+  ]
+}

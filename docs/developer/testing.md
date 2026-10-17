@@ -36,6 +36,10 @@ Run everything with `npm test` (Vitest). Automated tests **never call the real `
 - `test/fixtures/`: real output captured from the CLIs (`claude -p --output-format json`, `codex exec --json`), including failure cases. Recapture them when a CLI changes its format.
 - `test/helpers/config.ts`: `noSummaryConfig()` and `withSummaryConfig()` so tests control whether summary calls happen.
 
+## Benchmarks
+
+`npm run benchmark` (script: `scripts/benchmark.ts`) runs the **real** `claude` and `codex` in temporary repositories and records tokens, cost and correctness per run in `benchmarks/`. It spends real tokens (a few dollars), so it is not part of `npm test`. Results and method are published on the Benchmarks page of the guide; rerun it and update that page when routing, handoff or output parsing changes.
+
 ## Manual smoke test (before a release)
 
 Use a throwaway `ORCH_HOME` and run inside a git repository.

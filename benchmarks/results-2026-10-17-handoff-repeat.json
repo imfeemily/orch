@@ -1,0 +1,179 @@
+{
+  "meta": {
+    "date": "2026-10-17",
+    "node": "v24.16.0",
+    "claude": "2.1.231 (Claude Code)",
+    "codex": "codex-cli 0.162.1",
+    "platform": "darwin"
+  },
+  "records": [
+    {
+      "id": "C-codex-old-handoff-r1",
+      "experiment": "C",
+      "task": "receiving agent continues after failover",
+      "variant": "old handoff: diff up to 20,000 chars + summary",
+      "agent": "codex",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "inputTokens": 29103,
+        "cacheReadTokens": 28416,
+        "outputTokens": 55,
+        "reasoningTokens": 0
+      },
+      "billableTokens": 29158,
+      "durationMs": 6137,
+      "success": true,
+      "answerPreview": "1",
+      "promptChars": 20781
+    },
+    {
+      "id": "C-codex-new-handoff-r1",
+      "experiment": "C",
+      "task": "receiving agent continues after failover",
+      "variant": "new handoff: git diff --stat, no summary",
+      "agent": "codex",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "inputTokens": 13333,
+        "cacheReadTokens": 8064,
+        "outputTokens": 20,
+        "reasoningTokens": 0
+      },
+      "billableTokens": 13353,
+      "durationMs": 5322,
+      "success": true,
+      "answerPreview": "1",
+      "promptChars": 614
+    },
+    {
+      "id": "C-codex-new-handoff-r2",
+      "experiment": "C",
+      "task": "receiving agent continues after failover",
+      "variant": "new handoff: git diff --stat, no summary",
+      "agent": "codex",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "inputTokens": 11459,
+        "cacheReadTokens": 33792,
+        "outputTokens": 86,
+        "reasoningTokens": 0
+      },
+      "billableTokens": 11545,
+      "durationMs": 6380,
+      "success": true,
+      "answerPreview": "1",
+      "promptChars": 614
+    },
+    {
+      "id": "C-codex-old-handoff-r2",
+      "experiment": "C",
+      "task": "receiving agent continues after failover",
+      "variant": "old handoff: diff up to 20,000 chars + summary",
+      "agent": "codex",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "inputTokens": 239,
+        "cacheReadTokens": 28416,
+        "outputTokens": 5,
+        "reasoningTokens": 0
+      },
+      "billableTokens": 244,
+      "durationMs": 3878,
+      "success": true,
+      "answerPreview": "1",
+      "promptChars": 20781
+    },
+    {
+      "id": "C-codex-old-handoff-r3",
+      "experiment": "C",
+      "task": "receiving agent continues after failover",
+      "variant": "old handoff: diff up to 20,000 chars + summary",
+      "agent": "codex",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "inputTokens": 16413,
+        "cacheReadTokens": 40960,
+        "outputTokens": 40,
+        "reasoningTokens": 0
+      },
+      "billableTokens": 16453,
+      "durationMs": 6884,
+      "success": true,
+      "answerPreview": "1",
+      "promptChars": 20781
+    },
+    {
+      "id": "C-codex-new-handoff-r3",
+      "experiment": "C",
+      "task": "receiving agent continues after failover",
+      "variant": "new handoff: git diff --stat, no summary",
+      "agent": "codex",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "inputTokens": 12093,
+        "cacheReadTokens": 33792,
+        "outputTokens": 82,
+        "reasoningTokens": 0
+      },
+      "billableTokens": 12175,
+      "durationMs": 6251,
+      "success": true,
+      "answerPreview": "1",
+      "promptChars": 614
+    },
+    {
+      "id": "C-codex-new-handoff-r4",
+      "experiment": "C",
+      "task": "receiving agent continues after failover",
+      "variant": "new handoff: git diff --stat, no summary",
+      "agent": "codex",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "inputTokens": 14469,
+        "cacheReadTokens": 28416,
+        "outputTokens": 68,
+        "reasoningTokens": 0
+      },
+      "billableTokens": 14537,
+      "durationMs": 7105,
+      "success": true,
+      "answerPreview": "1",
+      "promptChars": 614
+    },
+    {
+      "id": "C-codex-old-handoff-r4",
+      "experiment": "C",
+      "task": "receiving agent continues after failover",
+      "variant": "old handoff: diff up to 20,000 chars + summary",
+      "agent": "codex",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "usage": {
+        "inputTokens": 16111,
+        "cacheReadTokens": 12544,
+        "outputTokens": 5,
+        "reasoningTokens": 0
+      },
+      "billableTokens": 16116,
+      "durationMs": 4348,
+      "success": true,
+      "answerPreview": "1",
+      "promptChars": 20781
+    }
+  ]
+}

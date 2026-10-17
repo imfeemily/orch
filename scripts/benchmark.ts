@@ -1,0 +1,325 @@
+/**
+ * Real-CLI benchmark: measures token use and cost with and without orch.
+ * It calls the real `claude` and `codex` and spends real tokens (a few dollars).
+ *
+ *   npm run build && npm run benchmark -- [--only A,B,C,D] [--out benchmarks/results-DATE.json]
+ *
+ * A: model routing   B: orch overhead   C: handoff cost   D: fixed context per call
+ * Everything runs in temporary copies of a small seeded repository.
+ */
+import { spawnSync } from "node:child_process";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { buildHandoff } from "../src/core/handoff.js";
+import { parseAgentOutput } from "../src/core/output.js";
+import type { Usage } from "../src/core/types.js";
+import { billableTokens } from "../src/core/usage.js";
+
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
+const CLI = join(ROOT, "dist/cli/index.js");
+const args = process.argv.slice(2);
+const flag = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
+const only = new Set((flag("--only") ?? "A,B,C,D").split(","));
+const date = new Date().toISOString().slice(0, 10);
+const C_REPEATS = Number(flag("--c-repeats") ?? 1);
+const SKIP_SUMMARY = args.includes("--skip-summary");
+const OUT = resolve(flag("--out") ?? join(ROOT, `benchmarks/results-${date}.json`));
+
+interface RunRecord {
+  id: string;
+  experiment: "A" | "B" | "C" | "D";
+  task: string;
+  variant: string;
+  agent: "claude" | "codex";
+  models: string[];
+  usage?: Usage;
+  billableTokens?: number;
+  costUsd?: number;
+  durationMs: number;
+  success: boolean | null;
+  promptChars?: number;
+  note?: string;
+  answerPreview?: string;
+}
+
+const records: RunRecord[] = [];
+function save(rec: RunRecord): RunRecord {
+  records.push(rec);
+  mkdirSync(dirname(OUT), { recursive: true });
+  writeFileSync(OUT, JSON.stringify({ meta: meta(), records }, null, 2));
+  const tok = rec.billableTokens !== undefined ? `${rec.billableTokens} tokens` : "no usage";
+  const cost = rec.costUsd !== undefined ? ` $${rec.costUsd.toFixed(4)}` : "";
+  console.log(`[${rec.id}] ${tok}${cost} ${Math.round(rec.durationMs / 1000)}s success=${rec.success}${rec.note ? ` (${rec.note})` : ""}`);
+  return rec;
+}
+
+function version(cmd: string): string {
+  return spawnSync(cmd, ["--version"], { encoding: "utf8" }).stdout.trim().split("\n")[0];
+}
+function meta() {
+  return { date, node: process.version, claude: version("claude"), codex: version("codex"), platform: process.platform };
+}
+
+// ---------- seeded repository ----------
+const WORK = mkdtempSync(join(tmpdir(), "orch-bench-"));
+const SEED = join(WORK, "seed");
+
+function sh(cwd: string, cmd: string, argv: string[]): string {
+  const r = spawnSync(cmd, argv, { cwd, encoding: "utf8" });
+  if (r.status !== 0) throw new Error(`${cmd} ${argv.join(" ")} failed: ${r.stderr}`);
+  return r.stdout;
+}
+function write(dir: string, file: string, content: string) {
+  mkdirSync(dirname(join(dir, file)), { recursive: true });
+  writeFileSync(join(dir, file), content);
+}
+function commitAll(dir: string, msg: string) {
+  sh(dir, "git", ["add", "-A"]);
+  sh(dir, "git", ["-c", "user.name=bench", "-c", "user.email=b@b", "commit", "-qm", msg]);
+}
+
+function seedRepo() {
+  mkdirSync(SEED, { recursive: true });
+  sh(SEED, "git", ["init", "-q"]);
+  write(SEED, "README.md", "# Demo\n\nThis small library lets you recieve events and print a greeting.\n\n## Usage\n\nImport `greet` and `clamp` from `src/`.\n");
+  write(SEED, "package.json", JSON.stringify({ name: "demo", type: "module", scripts: { test: "vitest run" } }, null, 2));
+  write(SEED, "src/math.ts", "export function add(a: number, b: number): number {\n  return a + b;\n}\n\nexport function clamp(value: number, min: number, max: number): number {\n  if (value < min) return min;\n  if (value > max) return max;\n  return value;\n}\n");
+  write(SEED, "src/greet.ts", 'export function greet(name: string): string {\n  return `Hello, ${name}!`;\n}\n');
+  write(SEED, "src/events.ts", "export type Handler = (payload: string) => void;\n\nexport class Emitter {\n  private handlers: Handler[] = [];\n  on(h: Handler): void {\n    this.handlers.push(h);\n  }\n  emit(payload: string): void {\n    for (const h of this.handlers) h(payload);\n  }\n}\n");
+  commitAll(SEED, "seed");
+}
+function freshRepo(label: string): string {
+  const dir = join(WORK, label);
+  cpSync(SEED, dir, { recursive: true });
+  return dir;
+}
+
+// ---------- runners ----------
+interface Measured {
+  usage?: Usage;
+  costUsd?: number;
+  models: string[];
+  durationMs: number;
+  text: string;
+  error?: string;
+}
+
+function claudeDirect(cwd: string, prompt: string, extra: string[] = [], head: string[] = []): Measured {
+  const t0 = Date.now();
+  const r = spawnSync("claude", [...head, "-p", "--output-format", "json", "--permission-mode", "acceptEdits", ...extra, "--", prompt], {
+    cwd, encoding: "utf8", timeout: 600_000, maxBuffer: 50 * 1024 * 1024,
+  });
+  const out = parseAgentOutput("claude-json", r.stdout ?? "");
+  let models: string[] = [];
+  try {
+    models = Object.keys(JSON.parse(r.stdout).modelUsage ?? {});
+  } catch { /* not JSON */ }
+  return { usage: out.usage, costUsd: out.usage?.costUsd, models, durationMs: Date.now() - t0, text: out.text, error: out.errorText ?? (r.status ? (r.stderr ?? "").slice(0, 200) : undefined) };
+}
+
+function codexDirect(cwd: string, prompt: string): Measured {
+  const t0 = Date.now();
+  const r = spawnSync("codex", ["exec", "--json", "--skip-git-repo-check", "-m", "gpt-6-luna", "-c", 'model_reasoning_effort="low"', "--", prompt], {
+    cwd, encoding: "utf8", timeout: 600_000, maxBuffer: 50 * 1024 * 1024,
+  });
+  const out = parseAgentOutput("codex-jsonl", r.stdout ?? "");
+  return { usage: out.usage, models: ["gpt-6-luna"], durationMs: Date.now() - t0, text: out.text, error: out.errorText };
+}
+
+/** Runs the task through the built `orch` CLI with its own throwaway ORCH_HOME and reads the ledger. */
+function viaOrch(cwd: string, prompt: string, configYaml: string): Measured {
+  const home = mkdtempSync(join(WORK, "home-"));
+  writeFileSync(join(home, "config.yaml"), configYaml);
+  const env = { ...process.env, ORCH_HOME: home };
+  const t0 = Date.now();
+  const r = spawnSync(process.execPath, [CLI, "run", "--cwd", cwd, prompt], { env, encoding: "utf8", timeout: 600_000 });
+  const durationMs = Date.now() - t0;
+  spawnSync(process.execPath, [CLI, "daemon", "stop"], { env });
+  const ledgerPath = join(home, "usage.jsonl");
+  const entries = existsSync(ledgerPath)
+    ? readFileSync(ledgerPath, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l))
+    : [];
+  const usage: Usage | undefined = entries.length
+    ? entries.reduce(
+        (acc: Usage, e: { usage?: Usage }) => ({
+          inputTokens: acc.inputTokens + (e.usage?.inputTokens ?? 0),
+          cacheReadTokens: acc.cacheReadTokens + (e.usage?.cacheReadTokens ?? 0),
+          outputTokens: acc.outputTokens + (e.usage?.outputTokens ?? 0),
+          costUsd: (acc.costUsd ?? 0) + (e.usage?.costUsd ?? 0),
+        }),
+        { inputTokens: 0, cacheReadTokens: 0, outputTokens: 0, costUsd: 0 },
+      )
+    : undefined;
+  const models = [...new Set(entries.map((e: { model?: string }) => e.model ?? "(default)"))] as string[];
+  return { usage, costUsd: usage?.costUsd, models, durationMs, text: r.stdout ?? "", error: r.status ? (r.stderr ?? "").slice(0, 200) : undefined };
+}
+
+function record(id: string, experiment: RunRecord["experiment"], task: string, variant: string, agent: RunRecord["agent"], m: Measured, success: boolean | null, extra: Partial<RunRecord> = {}) {
+  return save({
+    id, experiment, task, variant, agent, models: m.models, usage: m.usage,
+    billableTokens: m.usage ? billableTokens(m.usage) : undefined,
+    costUsd: m.costUsd, durationMs: m.durationMs, success,
+    note: m.error ? m.error.replace(/\s+/g, " ").slice(0, 160) : undefined,
+    answerPreview: m.text.slice(0, 160), ...extra,
+  });
+}
+
+// ---------- tasks ----------
+const TASKS = {
+  T1: {
+    name: "fix a typo",
+    prompt: "Fix the spelling mistake in README.md. Change only that word.",
+    check: (dir: string, _text: string) => {
+      const s = readFileSync(join(dir, "README.md"), "utf8");
+      return s.includes("receive") && !s.includes("recieve");
+    },
+  },
+  T2: {
+    name: "write a small test",
+    prompt: "Add a vitest test file at test/math.test.ts with tests for add() and clamp() from src/math.ts. Only create that file; do not run anything or install packages.",
+    check: (dir: string, _text: string) => {
+      const p = join(dir, "test/math.test.ts");
+      if (!existsSync(p)) return false;
+      const s = readFileSync(p, "utf8");
+      return s.includes("clamp") && s.includes("add");
+    },
+  },
+  T3: {
+    name: "explain code",
+    prompt: "Explain in three sentences or fewer what clamp() in src/math.ts does, including when it returns the lower bound. Do not modify files.",
+    check: (_dir: string, text: string) => /min/i.test(text) && /(below|less than|under|smaller|lower|<)/i.test(text),
+  },
+} as const;
+
+const ORCH_DEFAULT = `agents:
+  claude:
+    args: ["-p", "--output-format", "json", "--permission-mode", "acceptEdits", "--", "{prompt}"]
+    output: claude-json
+`;
+const ORCH_FAST = `${ORCH_DEFAULT}rules:
+  - match: "spelling|explain|vitest"
+    agent: claude
+    model: haiku
+    effort: low
+`;
+
+// ---------- experiments ----------
+const dirs: Record<string, string> = {};
+
+function expA() {
+  for (const [key, t] of Object.entries(TASKS)) {
+    const base = freshRepo(`A-${key}-base`);
+    dirs[`A-${key}-base`] = base;
+    const b = claudeDirect(base, t.prompt);
+    record(`A-${key}-base`, "A", t.name, "claude default model, run directly", "claude", b, t.check(base, b.text));
+
+    const routed = freshRepo(`A-${key}-fast`);
+    const o = viaOrch(routed, t.prompt, ORCH_FAST);
+    record(`A-${key}-fast`, "A", t.name, "orch rule: haiku + low effort", "claude", o, t.check(routed, o.text));
+  }
+}
+
+function expB() {
+  const t = TASKS.T1;
+  const base = freshRepo("B-T1-base2");
+  const b = claudeDirect(base, t.prompt);
+  record("B-T1-base-repeat", "B", t.name, "claude default model, run directly (repeat)", "claude", b, t.check(base, b.text));
+
+  const dir = freshRepo("B-T1-orch");
+  const o = viaOrch(dir, t.prompt, ORCH_DEFAULT);
+  record("B-T1-orch-default", "B", t.name, "same model, through orch (no rule)", "claude", o, t.check(dir, o.text));
+}
+
+const SUMMARY_PROMPT = "In under 200 words, summarize what you completed so far and what remains for the task you were working on.";
+const FINISH = "\n\nDo not modify any files. Reply with only the number of files that have uncommitted changes.";
+
+/** The handoff prompt as built before 0.2.1: diff up to 20,000 characters, plus a summary from the first agent. */
+function oldHandoff(prompt: string, status: string, diff: string, summary: string): string {
+  const MAX = 20_000;
+  const shown = diff.length <= MAX ? diff : `${diff.slice(0, MAX)}\n... [diff truncated, ${diff.length - MAX} more chars]`;
+  return [
+    "You are continuing a task started by another coding agent (claude), which stopped because it failed.",
+    `## Original task\n${prompt}`,
+    `## Working tree status\n${status.trimEnd()}`,
+    `## Diff so far\n${shown}`,
+    `## Summary from previous agent\n${summary}`,
+    "Continue from the current state of the working tree. Do not redo completed work.",
+  ].join("\n\n");
+}
+
+async function expC() {
+  // 1. real cost of the summary call that the old handoff made (resumes the last session in that directory)
+  const sessionDir = dirs["A-T2-base"];
+  let summary =
+    "I created test/math.test.ts with tests for add() and clamp() covering normal values, values below the minimum, values above the maximum and values equal to the bounds. The file is complete. Nothing else remains for this task; the only follow-up is to run the test suite once vitest is installed in the project.";
+  if (sessionDir && !SKIP_SUMMARY) {
+    const s = claudeDirect(sessionDir, SUMMARY_PROMPT, [], ["-c"]);
+    record("C-summary-call", "C", "handoff summary call", "claude -c -p resumes the previous session (old handoff only)", "claude", s, null);
+    if (s.text.trim()) summary = s.text.trim();
+  }
+
+  // 2. a repository with a large uncommitted change
+  const big = freshRepo("C-big");
+  const rows = (word: string) => Array.from({ length: 400 }, (_, i) => `export const ROW_${i} = { id: ${i}, ${word}: "item number ${i}", group: "g${i % 7}" };`).join("\n");
+  write(big, "src/table.ts", `${rows("label")}\n`);
+  commitAll(big, "table");
+  write(big, "src/table.ts", `${rows("title")}\n`);
+  const diff = sh(big, "git", ["diff", "HEAD"]);
+  const status = sh(big, "git", ["status", "--short"]);
+  const task = "Rename the label field to title in src/table.ts.";
+
+  const oldPrompt = `${oldHandoff(task, status, diff, summary)}${FINISH}`;
+  const newPrompt = `${await buildHandoff({ prompt: task, cwd: big, previousAgent: "claude", reason: "failed" })}${FINISH}`;
+  console.log(`handoff prompt sizes: old ${oldPrompt.length} chars, new ${newPrompt.length} chars (diff ${diff.length} chars)`);
+
+  const variants = [
+    ["old-handoff", "old handoff: diff up to 20,000 chars + summary", oldPrompt],
+    ["new-handoff", "new handoff: git diff --stat, no summary", newPrompt],
+  ] as const;
+  for (let r = 0; r < C_REPEATS; r++) {
+    // alternate the order so cache warmth does not favour one variant
+    for (const [name, variant, prompt] of r % 2 === 0 ? variants : [variants[1], variants[0]]) {
+      const m = codexDirect(big, prompt);
+      record(`C-codex-${name}${C_REPEATS > 1 ? `-r${r + 1}` : ""}`, "C", "receiving agent continues after failover", variant, "codex", m, /\b1\b/.test(m.text), { promptChars: prompt.length });
+    }
+  }
+}
+
+function expD() {
+  const probe = (id: string, variant: string, extra: string[]) => {
+    const dir = freshRepo(id);
+    const m = claudeDirect(dir, "reply with exactly the word pong and nothing else", extra);
+    record(id, "D", "one-word answer", variant, "claude", m, /pong/i.test(m.text));
+  };
+  probe("D-claude-default", "claude, default context", []);
+  probe("D-claude-bare", "claude --bare", ["--bare"]);
+  probe("D-claude-safe", "claude --safe-mode", ["--safe-mode"]);
+  probe("D-claude-no-skills", "claude --disable-slash-commands", ["--disable-slash-commands"]);
+  const dir = freshRepo("D-codex");
+  const m = codexDirect(dir, "reply with exactly the word pong and nothing else");
+  record("D-codex-default", "D", "one-word answer", "codex, default context", "codex", m, /pong/i.test(m.text));
+}
+
+async function main() {
+  if (!existsSync(CLI)) throw new Error("dist/ is missing: run `npm run build` first");
+  console.log(`Benchmark: spends real tokens. Experiments: ${[...only].join(", ")}. Output: ${OUT}`);
+  seedRepo();
+  const steps: Array<[string, () => void | Promise<void>]> = [["A", expA], ["B", expB], ["C", expC], ["D", expD]];
+  for (const [name, fn] of steps) {
+    if (!only.has(name)) continue;
+    console.log(`\n== Experiment ${name}`);
+    try {
+      await fn();
+    } catch (e) {
+      console.error(`experiment ${name} failed: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  console.log(`\nDone. ${records.length} runs saved to ${OUT}`);
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

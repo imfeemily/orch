@@ -4,6 +4,8 @@ All notable changes are listed here. Add user-visible changes under **Unreleased
 
 ## Unreleased
 
+- Benchmarks page (English and Thai) with real measurements of where orch saves tokens and cost, plus a reproducible harness (`npm run benchmark`, `scripts/benchmark.ts`) and the raw results in `benchmarks/`.
+
 - Usage ledger: every attempt is recorded in `~/.orch/usage.jsonl` with token counts (and cost for Claude). New `orch usage [--since 24h|7d] [--by agent|model]`, token totals in `orch status`, and `tokens=<n>` in the MCP `orch_run` result.
 - Agents now run in JSON mode by default (`--output-format json`, `--json`); new `output` setting per agent. `orch run` prints the clean final answer once; unexpected output falls back to plain text. Limit and login detection now reads the parsed error text, so failures reported in JSON are classified correctly.
 - Failure messages show the agent's reported error instead of empty stderr.
