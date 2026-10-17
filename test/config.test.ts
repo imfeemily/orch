@@ -178,6 +178,13 @@ describe("loadConfig", () => {
     bad("pipeline:\n  threads: 2\n", /pipeline\.threads/);
   });
 
+  it("treats a role you add as one that may change files unless you say otherwise, so it never runs in parallel by accident", () => {
+    const cfg = loadConfig(tmpFile("roles:\n  docs:\n    prompt: update the README\n  audit:\n    prompt: look only\n    writes: false\n"));
+    expect(cfg.roles.docs.writes).toBe(true);
+    expect(cfg.roles.audit.writes).toBe(false);
+    expect(cfg.roles.reviewer.writes).toBe(false); // built-in values are unchanged
+  });
+
   it("rejects an auto or pipeline block that is not a mapping, unknown keys, and non-mapping keywords", () => {
     const bad = (yaml: string, re: RegExp) => expect(() => loadConfig(tmpFile(yaml))).toThrow(re);
     bad("auto: true\n", /auto must be a mapping/);
@@ -194,7 +201,7 @@ describe("loadConfig", () => {
         'roles:\n  mine:\n    prompt: hi\n  reviewer:\n    model: haiku\nteams:\n  docs: [reviewer]\n',
       ),
     );
-    expect(cfg.roles.mine).toEqual({ prompt: "hi", needs: [], writes: false });
+    expect(cfg.roles.mine).toEqual({ prompt: "hi", needs: [], writes: true });
     expect(cfg.roles.reviewer).toMatchObject({ model: "haiku", context: "lean", writes: false });
     expect(cfg.roles.reviewer.prompt).toBe(DEFAULT_CONFIG.roles.reviewer.prompt);
     expect(cfg.teams.docs).toEqual(["reviewer"]);

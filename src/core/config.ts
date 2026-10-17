@@ -162,7 +162,7 @@ function mergeRoles(user: unknown): Record<string, RoleConfig> {
       if (role !== null && role !== undefined && (typeof role !== "object" || Array.isArray(role))) {
         throw new Error(`roles.${name} must be a mapping of role settings`);
       }
-      const base = merged[name] ?? { needs: [], writes: false };
+      const base = merged[name] ?? { needs: [], writes: true };
       const next = { ...base, ...(role ?? {}) } as RoleConfig;
       if (role?.agentArgs && base.agentArgs) next.agentArgs = { ...base.agentArgs, ...(role.agentArgs as object) };
       merged[name] = next;

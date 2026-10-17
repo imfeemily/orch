@@ -122,7 +122,7 @@ pipeline:
 - `roles.<name>.prompt`: คำสั่งที่กำหนด role (จำเป็นสำหรับ role ใหม่)
 - `roles.<name>.agent`, `model`, `effort`, `context`: role รันที่ไหนและอย่างไร เป็นของ role เอง rule ใน `rules` ไม่มีผลกับมัน
 - `roles.<name>.needs`: ความสามารถที่ role ต้องการจากเอเจนต์ มีเฉพาะ `image` role แบบนี้รันบน Codex เท่านั้น หลังตรวจความพร้อม และจะไม่ถูกย้ายไป Claude
-- `roles.<name>.writes`: `true` ถ้า role แก้ไฟล์โปรเจกต์ได้ ใช้บอกเจตนา ตัว flag สิทธิ์มาจาก `agentArgs`
+- `roles.<name>.writes`: `true` ถ้า role แก้ไฟล์โปรเจกต์ได้ และเป็นค่าเริ่มต้นของ role ที่คุณเพิ่ม มันกำหนดการรันพร้อมกัน: เฉพาะ role ที่ `writes: false` เท่านั้นที่รันขนานได้ จึงตั้งเป็น `false` เฉพาะ role ที่ไม่เคยแก้ไฟล์ ส่วน flag สิทธิ์มาจาก `agentArgs`
 - `roles.<name>.agentArgs`: อาร์กิวเมนต์เพิ่มเติมต่อเอเจนต์ ใส่ก่อน prompt role ที่เขียนไฟล์ต้องใส่ flag สิทธิ์ของเอเจนต์ที่นี่
 - `teams.<name>`: รายการชื่อ role ทีมรันตามลำดับ architecture, designer, developer, tester, reviewer, security (role นอกรายการนี้ตามหลังตามลำดับที่เขียน)
 - `pipeline.handoffChars`: จำนวนตัวอักษรสูงสุดของ handoff จาก role ก่อนหน้าที่ส่งให้ role (ค่าเริ่มต้น 4000)

@@ -48,9 +48,9 @@ Roles that edit files run one at a time. If a role fails (after failover), the t
 
 ## Parallel read-only roles
 
-Roles that do not change your files (`writes: false`: `architecture`, `designer`, `reviewer`, `security`) run **at the same time** when they are next to each other in the plan, so the built-in `reviewer` and `security` finish together instead of one after the other. A role that edits files (`developer`, `tester`) always runs alone, and nothing runs alongside it.
+Roles that do not change your files (`writes: false`: `architecture`, `designer`, `reviewer`, `security`; a role you add counts as one that writes unless you set `writes: false`) run **at the same time** when they are next to each other in the plan, so the built-in `reviewer` and `security` finish together instead of one after the other. A role that edits files (`developer`, `tester`) always runs alone, and nothing runs alongside it.
 
-- Parallel saves **time, not tokens**: every role is still one call, so the cost is the same.
+- Parallel saves **time, not tokens**: every role is still one call, so the cost should be about the same (the benchmark measured no clear difference).
 - Roles in a batch all start from the same earlier handoffs and never see each other's. Results, artifacts and the printed answer stay in plan order, whichever call finishes first.
 - If one role in a batch fails, its sibling still finishes and is recorded; the team then stops (add `--keep-going` to continue). Cancelling cancels the rest.
 - At most `pipeline.maxParallel` roles (default 2) run together, because simultaneous calls use up a rate limit faster. Set `pipeline.parallel: false` or pass `--sequential` to run one role at a time.
