@@ -18,6 +18,20 @@ orch usage --since 7d --by model                # token usage from the ledger
 
 The complete command list is generated from the code: see the [CLI reference](/reference/cli).
 
+## Usage and cost
+
+orch records every agent attempt in `~/.orch/usage.jsonl` (kept for 90 days) and reads token counts from the agent's JSON output.
+
+```bash
+orch usage                         # last 24 hours, per agent
+orch usage --since 7d --by model   # last 7 days, per model
+```
+
+- The token figure is *billable tokens*: input excluding cache reads, plus output (reasoning is already inside output). It is an approximation for tracking quota, not the vendor's own accounting.
+- Claude also reports a cost in USD; Codex reports tokens only.
+- `orch status` shows the last 24 hours per agent, and the MCP `orch_run` result ends with `tokens=<n>`.
+- Agents are started in JSON mode (`--output-format json` for Claude, `--json` for Codex), so `orch run` prints only the final answer, once, when the agent finishes.
+
 ## From Claude Code and Codex (MCP)
 
 ```bash

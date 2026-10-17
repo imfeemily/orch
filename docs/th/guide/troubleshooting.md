@@ -7,6 +7,7 @@
 | `You've hit your usage limit` | limit จริง orch จะพักเอเจนต์นั้นจนถึงเวลา reset ในข้อความ แล้วใช้อีกตัว ดูที่ `orch status` |
 | `Not inside a trusted directory` (Codex) | รันในโฟลเดอร์ที่เป็น git repository หรือเพิ่ม `--skip-git-repo-check` ใน `args` ของ Codex |
 | `orch daemon did not start` | รัน `node "$(npm root -g)/claude-codex-orch/dist/daemon/index.js"` ในเทอร์มินัลเพื่อดู error (มักเป็น `config.yaml` พิมพ์ผิด) |
+| `orch usage` ไม่แสดงอะไร หรือโทเค่นเป็น 0 | orch ถอยกลับเป็นข้อความธรรมดา: เขียนทับ `args` โดยไม่มี flag JSON หรือ CLI เปลี่ยนรูปแบบ output ใส่ `--output-format json` (Claude) หรือ `--json` (Codex) กลับ หรือตั้ง `output: text` เพื่อเลิกคาดหวัง JSON |
 | แก้ config แล้วไม่เปลี่ยน | daemon อ่าน config ครั้งเดียว สั่ง `orch daemon stop` แล้วคำสั่งถัดไปจะเปิดใหม่ |
 | `cwd must be an existing absolute directory` | MCP client ส่ง path ที่ไม่มีอยู่จริง ให้ส่ง `cwd` เป็น absolute path |
 | งานนานแล้ว timeout จาก Codex | เพิ่ม `tool_timeout_sec` ของ MCP server `orch` ใน `~/.codex/config.toml` |

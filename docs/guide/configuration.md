@@ -26,7 +26,7 @@ rules:
 
 - `command`: the executable to run.
 - `args`: argument template. Every `{prompt}` is replaced by the prompt, which is always passed as one argument without a shell. Keep the `--` before `{prompt}` so a prompt starting with `-` is not read as a flag. Put permission or sandbox flags here.
-- `output`: how orch reads the agent's stdout: `claude-json`, `codex-jsonl` or `text`. The JSON kinds give orch the clean answer and token usage; if the output does not match, orch falls back to plain text without usage.
+- `output`: how orch reads the agent's stdout: `claude-json`, `codex-jsonl` or `text`. The JSON kinds give orch the clean answer and token usage; if the output does not match, orch falls back to plain text without usage. The default `args` include `--output-format json` (Claude) and `--json` (Codex); if you override `args`, keep that flag or set `output: text`.
 - `summaryArgs`: template used to ask the agent for a handoff summary (resumes its last session). Remove it to disable summaries.
 - `modelArgs`: inserted before `--` when a rule sets a `model`; every `{model}` is replaced.
 - `effortArgs`: inserted before `--` when a rule sets an `effort`; every `{effort}` is replaced.

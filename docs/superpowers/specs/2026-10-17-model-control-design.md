@@ -37,7 +37,7 @@ see how many tokens it has spent.
 | Delivery | 1 measure, 2 tiers and overrides, 3 difficulty estimate, 4 quota routing |
 | Failover | Keeps the tier; uses the other agent's own model for it |
 | Escalation | If the first attempt **failed** (not limited), the failover runs one tier higher |
-| Quota unit | Approximate tokens: input excluding cache reads + output (+ reasoning) |
+| Quota unit | Approximate tokens: input excluding cache reads + output (reasoning is already inside output) |
 
 ## Verified facts about the CLIs (2026-10-17)
 
@@ -174,4 +174,4 @@ and `CHANGELOG.md`.
 - Parsing depends on each CLI's JSON shape; mitigated by fallback to `text` and fixtures that document the shape.
 - Token counts are approximate for quota purposes (Claude cache-creation and Codex cached input are weighted by us, not by the vendor).
 - Heuristic accuracy is moderate; `orch explain` and the ledger exist so thresholds can be tuned from evidence.
-- Whether Claude's `--output-format json` changes the `-c` resume behavior used for summaries must be confirmed in Stage 1.
+- Resolved in Stage 1: summary calls keep their text-mode `summaryArgs` (not forced to JSON) and are parsed with the same fallback, so the `-c` resume behavior is untouched.

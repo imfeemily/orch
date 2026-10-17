@@ -19,6 +19,20 @@ orch usage --since 7d --by model                # ยอดโทเค่นจ
 
 รายการคำสั่งทั้งหมดสร้างจากโค้ดโดยตรง ดูที่ [CLI reference](/reference/cli)
 
+## การใช้งานและค่าใช้จ่าย
+
+orch บันทึกทุก attempt ของเอเจนต์ลง `~/.orch/usage.jsonl` (เก็บ 90 วัน) และอ่านจำนวนโทเค่นจาก JSON output ของเอเจนต์
+
+```bash
+orch usage                         # 24 ชั่วโมงล่าสุด แยกตามเอเจนต์
+orch usage --since 7d --by model   # 7 วันล่าสุด แยกตาม model
+```
+
+- ตัวเลขโทเค่นคือ *billable tokens*: input ที่ไม่รวม cache read บวก output (reasoning รวมอยู่ใน output แล้ว) เป็นค่าประมาณไว้ติดตามโควต้า ไม่ใช่การนับของผู้ให้บริการ
+- Claude รายงานค่าใช้จ่ายเป็น USD ด้วย ส่วน Codex รายงานเฉพาะโทเค่น
+- `orch status` แสดงยอด 24 ชั่วโมงล่าสุดต่อเอเจนต์ และผลของ MCP `orch_run` ปิดท้ายด้วย `tokens=<n>`
+- เอเจนต์ถูกเรียกในโหมด JSON (`--output-format json` ของ Claude, `--json` ของ Codex) ดังนั้น `orch run` จะพิมพ์เฉพาะคำตอบสุดท้ายหนึ่งครั้งเมื่อเอเจนต์ทำงานเสร็จ
+
 ## จาก Claude Code และ Codex (MCP)
 
 ```bash

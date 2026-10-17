@@ -18,6 +18,7 @@ Run everything with `npm test` (Vitest). Automated tests **never call the real `
 | Failover, cooldown, auth, abort | `orchestrator.test.ts`, `orchestrator-summary.test.ts` |
 | Spawning | `runner.test.ts` with `test/helpers/fake-agent.mjs` |
 | Handoff | `handoff.test.ts` |
+| Output parsing, ledger, usage report | `output.test.ts`, `usage.test.ts`, `orchestrator-output.test.ts`, `usage-report.test.ts`, `render.test.ts` |
 | State | `state.test.ts` |
 | Daemon and client | `daemon.test.ts` |
 | CLI parsing | `args.test.ts` |
@@ -32,6 +33,7 @@ Run everything with `npm test` (Vitest). Automated tests **never call the real `
 ## Test helpers
 
 - `test/helpers/fake-agent.mjs`: a small script with modes `ok`, `limit`, `fail`, `echo-args`, `depth`, `sleep`, used to exercise the real runner.
+- `test/fixtures/`: real output captured from the CLIs (`claude -p --output-format json`, `codex exec --json`), including failure cases. Recapture them when a CLI changes its format.
 - `test/helpers/config.ts`: `noSummaryConfig()` and `withSummaryConfig()` so tests control whether summary calls happen.
 
 ## Manual smoke test (before a release)

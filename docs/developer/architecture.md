@@ -20,6 +20,8 @@ orch is a pure library (`core`) wrapped by a daemon, with two thin clients (CLI 
 | `src/core/agent-args.ts` | `buildAgentArgs`: insert model/effort flags before the `--` guard |
 | `src/core/runner.ts` | `runCommand`: spawn without a shell, stream stdout, timeout, abort, `ORCH_DEPTH` |
 | `src/core/detector.ts` | `classify`: `ok`, `limited`, `auth` or `failed` from exit code and output |
+| `src/core/output.ts` | `parseAgentOutput`: the answer, error text and token usage from Claude JSON, Codex JSONL or plain text; anything unexpected falls back to the raw text |
+| `src/core/usage.ts` | `Ledger` (`usage.jsonl`, never throws), `summarize`, `billableTokens`, `parseDuration` |
 | `src/core/reset.ts` | `parseResetTime`: reset time from a limit message (clock, epoch, relative) |
 | `src/core/handoff.ts` | `buildHandoff`: original prompt, `git status`, diff or `--stat`, summary |
 | `src/core/state.ts` | `StateStore`: cooldowns and the last 50 jobs, atomic JSON writes |
@@ -32,14 +34,14 @@ orch is a pure library (`core`) wrapped by a daemon, with two thin clients (CLI 
 
 1. Reject when `depth >= 1` (an orch-started agent called orch).
 2. `pickRoute` chooses an agent that is not cooling down, plus the matching rule's model/effort. All agents cooling returns status `unavailable`.
-3. `runAttempt` builds argv with `buildAgentArgs`, runs it, then **scrubs the prompt out of the output** (CLIs echo it, and the handoff text itself contains "rate limit") before classifying.
+3. `runAttempt` builds argv with `buildAgentArgs`, runs it, **parses the output** into answer, error text and usage, then **scrubs the prompt out of that text** (CLIs echo it, and the handoff text itself contains "rate limit") before classifying. Every attempt is appended to the usage ledger. JSON agents are not streamed: their raw stdout is machine output, so the CLI prints the final answer once.
 4. `limited` sets a cooldown: the parsed reset time, else `defaultCooldownSec`.
 5. On anything but `ok`: if the caller aborted, stop. If the other agent is cooling, return `failed`. Otherwise build the handoff (asking the first agent for a summary only after a plain `failed`) and run the other agent once, without the rule's model.
 6. Every outcome except `rejected` appends a job record.
 
 ## Classification
 
-`classify` checks, in order: exit code 0 is `ok`; a `limitPatterns` match is `limited`; an `authPatterns` match is `auth`; anything else is `failed`. Only stderr and the **last 20 lines of stdout** are searched, so an agent's work text that mentions "rate limit" cannot trigger a cooldown.
+`classify` checks, in order: exit code 0 is `ok`; a `limitPatterns` match is `limited`; an `authPatterns` match is `auth`; anything else is `failed`. Only stderr and the **last 20 lines of the parsed output** (the agent's error text when it reported one, otherwise its answer) are searched, so an agent's work text that mentions "rate limit" cannot trigger a cooldown.
 
 ## Daemon protocol
 
@@ -55,6 +57,12 @@ A client starts the daemon on demand (`connectOrStart`) after loading the config
 ## State
 
 `~/.orch/state.json`: `{ cooldowns: { claude?: ms, codex?: ms }, jobs: JobEntry[] }`. Missing or corrupt files read as empty. Writes go to a temp file and are renamed.
+
+## Usage ledger
+
+`~/.orch/usage.jsonl` is an append-only JSON Lines file with one entry per attempt (`at`, `taskId`, `agent`, `model?`, `outcome`, `usage?`, `durationMs`, `promptChars`). A failover writes two entries with the same `taskId`. Writes never throw, corrupt lines are skipped on read, and the daemon trims entries older than 90 days at start. `orch usage` and `orch status` read the file directly; no daemon round trip.
+
+Token units: `inputTokens` excludes cache reads (Claude's cache creation counts as input; Codex's cached input is subtracted), and `billableTokens = inputTokens + outputTokens`.
 
 ## Design decisions worth knowing
 

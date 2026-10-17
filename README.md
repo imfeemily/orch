@@ -27,6 +27,7 @@ orch init            # creates ~/.orch/config.yaml if it does not exist
 orch run "add a health check endpoint"       # runs in the current directory
 orch run --cwd ~/code/app "fix the failing test"
 orch status                                  # cooldowns + recent jobs
+orch usage --since 7d --by model             # token usage from the ledger
 orch daemon stop                             # also required after editing config.yaml
 ```
 

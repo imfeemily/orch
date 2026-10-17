@@ -27,7 +27,7 @@ rules:
 
 - `command`: โปรแกรมที่จะรัน
 - `args`: แม่แบบอาร์กิวเมนต์ `{prompt}` จะถูกแทนด้วย prompt เสมอในรูปอาร์กิวเมนต์เดียวโดยไม่ผ่าน shell ให้เก็บ `--` ไว้หน้า `{prompt}` เพื่อให้ prompt ที่ขึ้นต้นด้วย `-` ไม่ถูกอ่านเป็น flag ใส่ flag สิทธิ์/sandbox ที่นี่
-- `output`: วิธีที่ orch อ่าน stdout ของเอเจนต์: `claude-json`, `codex-jsonl` หรือ `text` แบบ JSON ให้ orch ได้คำตอบที่สะอาดและยอดโทเค่น ถ้าผลลัพธ์ไม่ตรงรูปแบบจะถอยกลับเป็นข้อความธรรมดาโดยไม่มี usage
+- `output`: วิธีที่ orch อ่าน stdout ของเอเจนต์: `claude-json`, `codex-jsonl` หรือ `text` แบบ JSON ให้ orch ได้คำตอบที่สะอาดและยอดโทเค่น ถ้าผลลัพธ์ไม่ตรงรูปแบบจะถอยกลับเป็นข้อความธรรมดาโดยไม่มี usage `args` เริ่มต้นมี `--output-format json` (Claude) และ `--json` (Codex) ถ้าเขียนทับ `args` ให้คง flag นี้ไว้ หรือตั้ง `output: text`
 - `summaryArgs`: แม่แบบสำหรับขอสรุปส่งต่อ (resume session ล่าสุด) ลบทิ้งถ้าไม่ต้องการสรุป
 - `modelArgs`: ถูกแทรกก่อน `--` เมื่อ rule กำหนด `model` ทุก `{model}` ถูกแทนด้วยชื่อ model
 - `effortArgs`: ถูกแทรกก่อน `--` เมื่อ rule กำหนด `effort` ทุก `{effort}` ถูกแทนด้วยระดับ
