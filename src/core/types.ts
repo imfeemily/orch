@@ -90,7 +90,7 @@ export interface Config {
   roles: Record<string, RoleConfig>;
   /** team name to role names */
   teams: Record<string, string[]>;
-  pipeline: { handoffChars: number };
+  pipeline: { handoffChars: number; parallel: boolean; maxParallel: number };
   auto: AutoConfig;
 }
 

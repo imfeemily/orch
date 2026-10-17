@@ -116,7 +116,7 @@ export const DEFAULT_CONFIG: Config = {
     standard: ["developer", "tester", "reviewer"],
     full: ["architecture", "designer", "developer", "tester", "reviewer", "security"],
   },
-  pipeline: { handoffChars: 4000 },
+  pipeline: { handoffChars: 4000, parallel: true, maxParallel: 2 },
   auto: { enabled: false, maxRoles: 3 },
   rules: [
     { match: "refactor|architecture|migrate|redesign", agent: "claude" },
@@ -201,7 +201,7 @@ export function loadConfig(path?: string): Config {
     contexts: mergeContexts(raw.contexts),
     roles: mergeRoles(raw.roles),
     teams: { ...structuredClone(DEFAULT_CONFIG.teams), ...(raw.teams ?? {}) },
-    pipeline: mergeKnown("pipeline", DEFAULT_CONFIG.pipeline, raw.pipeline, ["handoffChars"]),
+    pipeline: mergeKnown("pipeline", DEFAULT_CONFIG.pipeline, raw.pipeline, ["handoffChars", "parallel", "maxParallel"]),
     auto: mergeKnown("auto", DEFAULT_CONFIG.auto, raw.auto, ["enabled", "maxRoles", "keywords"]),
   };
   validate(cfg);
@@ -276,6 +276,10 @@ function validate(cfg: Config): void {
   }
   if (!Number.isInteger(cfg.pipeline.handoffChars) || cfg.pipeline.handoffChars <= 0) {
     throw new Error("pipeline.handoffChars must be a positive integer");
+  }
+  if (typeof cfg.pipeline.parallel !== "boolean") throw new Error("pipeline.parallel must be true or false");
+  if (!Number.isInteger(cfg.pipeline.maxParallel) || cfg.pipeline.maxParallel < 1) {
+    throw new Error("pipeline.maxParallel must be an integer of at least 1");
   }
   for (const rule of cfg.rules) {
     if (rule.context !== undefined && !Object.hasOwn(cfg.contexts, rule.context)) {

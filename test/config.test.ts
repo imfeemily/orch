@@ -164,6 +164,20 @@ describe("loadConfig", () => {
     bad("auto:\n  keywords:\n    security: pii\n", /auto\.keywords\.security/);
   });
 
+  it("ships parallel read-only roles on with at most two at once, and merges user pipeline settings", () => {
+    expect(DEFAULT_CONFIG.pipeline).toEqual({ handoffChars: 4000, parallel: true, maxParallel: 2 });
+    const cfg = loadConfig(tmpFile("pipeline:\n  parallel: false\n  maxParallel: 3\n"));
+    expect(cfg.pipeline).toEqual({ handoffChars: 4000, parallel: false, maxParallel: 3 });
+  });
+
+  it("rejects an invalid pipeline.parallel or pipeline.maxParallel", () => {
+    const bad = (yaml: string, re: RegExp) => expect(() => loadConfig(tmpFile(yaml))).toThrow(re);
+    bad('pipeline:\n  parallel: "yes"\n', /pipeline\.parallel/);
+    bad("pipeline:\n  maxParallel: 0\n", /pipeline\.maxParallel/);
+    bad("pipeline:\n  maxParallel: 1.5\n", /pipeline\.maxParallel/);
+    bad("pipeline:\n  threads: 2\n", /pipeline\.threads/);
+  });
+
   it("rejects an auto or pipeline block that is not a mapping, unknown keys, and non-mapping keywords", () => {
     const bad = (yaml: string, re: RegExp) => expect(() => loadConfig(tmpFile(yaml))).toThrow(re);
     bad("auto: true\n", /auto must be a mapping/);
