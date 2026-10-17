@@ -8,6 +8,7 @@
  * E: context presets (`--context lean`) against the default context
  * F: roles: one plain call against `--team standard` on the same task
  * G: the designer role on Codex (image files) and `--auto` on the same small task
+ * H: `reviewer` and `security` in parallel against one at a time (wall time and cost)
  * Everything runs in temporary copies of a small seeded repository.
  */
 import { spawnSync } from "node:child_process";
@@ -24,7 +25,7 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const CLI = join(ROOT, "dist/cli/index.js");
 const args = process.argv.slice(2);
 const flag = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
-const only = new Set((flag("--only") ?? "A,B,C,D,E,F,G").split(","));
+const only = new Set((flag("--only") ?? "A,B,C,D,E,F,G,H").split(","));
 const date = new Date().toISOString().slice(0, 10);
 const C_REPEATS = Number(flag("--c-repeats") ?? 1);
 const SKIP_SUMMARY = args.includes("--skip-summary");
@@ -32,7 +33,7 @@ const OUT = resolve(flag("--out") ?? join(ROOT, `benchmarks/results-${date}.json
 
 interface RunRecord {
   id: string;
-  experiment: "A" | "B" | "C" | "D" | "E" | "F" | "G";
+  experiment: "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H";
   task: string;
   variant: string;
   agent: "claude" | "codex";
@@ -406,11 +407,35 @@ function expG() {
   record("G-auto", "G", t.name, "orch --auto", "claude", a, t.check(autoDir, a.text), { perRole: perRole(a.entries), autoRoles: roles });
 }
 
+/** A repository with a committed login module and an uncommitted change that has reviewable problems. */
+function reviewRepo(label: string): string {
+  const dir = freshRepo(label);
+  write(dir, "src/auth.ts", "const users = new Map<string, string>();\n\nexport function register(name: string, hash: string): void {\n  users.set(name, hash);\n}\n\nexport function login(name: string, hash: string): boolean {\n  return users.get(name) === hash;\n}\n");
+  commitAll(dir, "add auth");
+  write(dir, "src/auth.ts", "import { db } from \"./db.js\";\n\nexport async function login(name: string, password: string): Promise<boolean> {\n  console.log(`login attempt ${name} ${password}`);\n  const rows = await db.query(\"SELECT * FROM users WHERE name = '\" + name + \"' AND password = '\" + password + \"'\");\n  return rows.length > 0;\n}\n");
+  return dir;
+}
+
+/** The same two read-only roles run in parallel and one at a time; order alternates between rounds. */
+function expH() {
+  const task = "Review the login change in src/auth.ts for correctness and security.";
+  const runOnce = (id: string, extra: string[], variant: string) => {
+    const dir = reviewRepo(id);
+    const m = viaOrch(dir, task, "", ["--roles", "reviewer,security", ...extra]);
+    const ok = ["reviewer ok", "security ok"].every((s) => (m.stderr ?? "").includes(s));
+    record(id, "H", "review a login change with reviewer and security", variant, "claude", m, ok, { perRole: perRole(m.entries) });
+  };
+  runOnce("H-parallel-1", [], "parallel (default)");
+  runOnce("H-sequential-1", ["--sequential"], "--sequential");
+  runOnce("H-sequential-2", ["--sequential"], "--sequential");
+  runOnce("H-parallel-2", [], "parallel (default)");
+}
+
 async function main() {
   if (!existsSync(CLI)) throw new Error("dist/ is missing: run `npm run build` first");
   console.log(`Benchmark: spends real tokens. Experiments: ${[...only].join(", ")}. Output: ${OUT}`);
   seedRepo();
-  const steps: Array<[string, () => void | Promise<void>]> = [["A", expA], ["B", expB], ["C", expC], ["D", expD], ["E", expE], ["F", expF], ["G", expG]];
+  const steps: Array<[string, () => void | Promise<void>]> = [["A", expA], ["B", expB], ["C", expC], ["D", expD], ["E", expE], ["F", expF], ["G", expG], ["H", expH]];
   for (const [name, fn] of steps) {
     if (!only.has(name)) continue;
     console.log(`\n== Experiment ${name}`);

@@ -1,0 +1,171 @@
+{
+  "meta": {
+    "date": "2026-10-17",
+    "node": "v24.16.0",
+    "claude": "2.1.231 (Claude Code)",
+    "codex": "codex-cli 0.162.1",
+    "platform": "darwin"
+  },
+  "records": [
+    {
+      "id": "H-parallel-1",
+      "experiment": "H",
+      "task": "review a login change with reviewer and security",
+      "variant": "parallel (default)",
+      "agent": "claude",
+      "models": [
+        "(default)"
+      ],
+      "usage": {
+        "inputTokens": 38649,
+        "cacheReadTokens": 804859,
+        "outputTokens": 7372,
+        "costUsd": 0.5837877
+      },
+      "billableTokens": 46021,
+      "costUsd": 0.5837877,
+      "durationMs": 72853,
+      "success": true,
+      "answerPreview": "## reviewer\n## Review: `src/auth.ts` login change\n\n**1. SQL injection \u2014 `src/auth.ts:5` (critical)**\n```ts\nconst rows = await db.query(\"SELECT * FROM users WHER",
+      "perRole": {
+        "reviewer": {
+          "billableTokens": 22669,
+          "costUsd": 0.2692863
+        },
+        "security": {
+          "billableTokens": 23352,
+          "costUsd": 0.3145014
+        }
+      }
+    },
+    {
+      "id": "H-sequential-1",
+      "experiment": "H",
+      "task": "review a login change with reviewer and security",
+      "variant": "--sequential",
+      "agent": "claude",
+      "models": [
+        "(default)"
+      ],
+      "usage": {
+        "inputTokens": 37391,
+        "cacheReadTokens": 378563,
+        "outputTokens": 4692,
+        "costUsd": 0.40822290000000006
+      },
+      "billableTokens": 42083,
+      "costUsd": 0.40822290000000006,
+      "durationMs": 68610,
+      "success": true,
+      "answerPreview": "## reviewer\nReview complete. Findings below, most serious first.\n\n**1. SQL injection (critical) \u2014 `src/auth.ts:5`**\nUser-controlled `name` and `password` are co",
+      "perRole": {
+        "reviewer": {
+          "billableTokens": 19397,
+          "costUsd": 0.17818950000000003
+        },
+        "security": {
+          "billableTokens": 22686,
+          "costUsd": 0.2300334
+        }
+      }
+    },
+    {
+      "id": "H-sequential-2",
+      "experiment": "H",
+      "task": "review a login change with reviewer and security",
+      "variant": "--sequential",
+      "agent": "claude",
+      "models": [
+        "(default)"
+      ],
+      "usage": {
+        "inputTokens": 39218,
+        "cacheReadTokens": 413152,
+        "outputTokens": 5273,
+        "costUsd": 0.43827059999999995
+      },
+      "billableTokens": 44491,
+      "costUsd": 0.43827059999999995,
+      "durationMs": 82495,
+      "success": true,
+      "answerPreview": "## reviewer\n## Handoff\n\n`src/auth.ts` is not safe to merge: the query is built by raw string concatenation of `name`/`password` (classic SQL injection, includin",
+      "perRole": {
+        "reviewer": {
+          "billableTokens": 21566,
+          "costUsd": 0.2077182
+        },
+        "security": {
+          "billableTokens": 22925,
+          "costUsd": 0.2305524
+        }
+      }
+    },
+    {
+      "id": "H-parallel-2",
+      "experiment": "H",
+      "task": "review a login change with reviewer and security",
+      "variant": "parallel (default)",
+      "agent": "claude",
+      "models": [
+        "(default)"
+      ],
+      "usage": {
+        "inputTokens": 35070,
+        "cacheReadTokens": 306207,
+        "outputTokens": 3771,
+        "costUsd": 0.3587871
+      },
+      "billableTokens": 38841,
+      "costUsd": 0.3587871,
+      "durationMs": 31247,
+      "success": true,
+      "answerPreview": "## reviewer\nThis is a small sample repo. I have everything needed to review.\n\n## Code Review: src/auth.ts\n\n**1. SQL injection (critical) \u2014 `src/auth.ts:5`**\n`na",
+      "perRole": {
+        "reviewer": {
+          "billableTokens": 19417,
+          "costUsd": 0.1890417
+        },
+        "security": {
+          "billableTokens": 19424,
+          "costUsd": 0.16974540000000002
+        }
+      }
+    },
+    {
+      "id": "H-extra-parallel-1",
+      "experiment": "H",
+      "variant": "parallel (default), timing check outside the harness",
+      "durationMs": 37490,
+      "perRole": {
+        "security": {
+          "durationMs": 24400
+        },
+        "reviewer": {
+          "durationMs": 37300
+        }
+      },
+      "startOffsetsMs": {
+        "security": 0,
+        "reviewer": 0
+      }
+    },
+    {
+      "id": "H-extra-parallel-2",
+      "experiment": "H",
+      "variant": "parallel (default), timing check outside the harness",
+      "durationMs": 36020,
+      "perRole": {
+        "security": {
+          "durationMs": 27900
+        },
+        "reviewer": {
+          "durationMs": 35900
+        }
+      },
+      "startOffsetsMs": {
+        "security": 0,
+        "reviewer": 0
+      }
+    }
+  ]
+}

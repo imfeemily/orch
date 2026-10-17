@@ -18,6 +18,7 @@ Few runs, one machine, one small repository, three small tasks. Treat the number
 | **Roles** (`--team standard`: developer, tester, reviewer) | **Costs more, by design:** 2.5x the tokens, 2.8x the cost and 3.7x the time of one plain call on a small task; all three roles succeeded | Medium: one task, one run |
 | **Image role** (`--role designer` on Codex) | A valid SVG mockup in 23 s; **21,200 billable tokens** (19,989 input + 1,211 output, plus 110,592 cached input) | Medium: one run |
 | **Auto selection** (`--auto`) | Chose `developer` and `tester` for a small test task: **2 calls, $0.5889** against $0.8078 for the 3-role team and $0.2931 for one call | Medium: one run |
+| **Parallel read-only roles** (`reviewer` and `security` together) | About **1.7x faster** wall time on average (44 s against 76 s), **same cost**; the two roles start together and the run takes as long as the slower one | Medium: few runs, large variance |
 | **Fixed context per call** if you do nothing | Not reduced by default: 44% to 86% of the cost of a small task. `--safe-mode` (preset `minimal`) cuts a one-word call by 68% but also drops project instructions | Good |
 
 The key point: **orch saves money mainly by choosing a cheaper model for small tasks, not by sending fewer tokens.** Token counts barely moved (-27%), cost fell by three quarters because a token on `haiku` is much cheaper than a token on `sonnet`.
@@ -144,6 +145,22 @@ What the extra calls bought: the reviewer checked the generated test against the
 
 Limits: one run each. The image result is the model's drawing, not a measure of design quality.
 
+## Experiment H: parallel read-only roles
+
+`reviewer` and `security` reviewing the same uncommitted login change (SQL built by string concatenation, a password written to the log), run in parallel (the default) and with `--sequential`, order alternated between rounds.
+
+| Run | Wall time | Tokens | Cost |
+|---|---|---|---|
+| parallel, round 1 | 73 s | 46,021 | $0.5838 |
+| sequential, round 1 | 69 s | 42,083 | $0.4082 |
+| sequential, round 2 | 82 s | 44,491 | $0.4383 |
+| parallel, round 2 | 31 s | 38,841 | $0.3588 |
+| parallel, two extra timing checks | 37 s and 36 s | | |
+
+Mean wall time: **44 s parallel** (over the four parallel runs) against **76 s sequential** (two runs), about 1.7 times faster. In the two extra checks the ledger shows both roles starting at the same moment (offset 0.0 s) and finishing after 24 s and 37 s, and 28 s and 36 s: the run takes as long as the slower role, where one at a time would take their sum (about 61 s and 64 s). All runs succeeded and both roles reported ok.
+
+**Reading it honestly.** The speed-up is real in principle (the overlap is visible in the timings) but the numbers are noisy: the first parallel run took 73 s, no faster than sequential, probably cold caches and API latency, and cost per run varied between $0.36 and $0.58 for the same work. Parallel does not change what is spent: every role is still one call. It only changes how long you wait, and by at most the shorter role's time.
+
 ## What to do with this
 
 1. **Add model rules for small tasks.** This is the saving that measured clearly. Start with typo, rename, explain and small-test rules (see [Configuration](/guide/configuration)), check `orch usage --by model`, and widen only if results stay correct.
@@ -170,6 +187,7 @@ npm run benchmark -- --only A,B                    # a subset
 npm run benchmark -- --only E                      # context presets
 npm run benchmark -- --only F                      # roles: one call against a team
 npm run benchmark -- --only G                      # the image role and auto selection
+npm run benchmark -- --only H                      # parallel against one-at-a-time read-only roles
 npm run benchmark -- --only C --c-repeats 4 --skip-summary --out benchmarks/my-run.json
 ```
 
