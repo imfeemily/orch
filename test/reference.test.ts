@@ -26,6 +26,13 @@ describe("renderConfigReference", () => {
     for (const rule of DEFAULT_CONFIG.rules) expect(md).toContain(rule.match);
   });
 
+  it("lists the roles and teams", () => {
+    expect(md).toContain("Roles");
+    for (const name of [...Object.keys(DEFAULT_CONFIG.roles), ...Object.keys(DEFAULT_CONFIG.teams)]) {
+      expect(md).toContain(name);
+    }
+  });
+
   it("lists the context presets", () => {
     expect(md).toContain("Context presets");
     for (const name of Object.keys(DEFAULT_CONFIG.contexts)) expect(md).toContain(name);

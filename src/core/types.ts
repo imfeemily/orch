@@ -55,11 +55,34 @@ export interface RouteRule {
 /** Named sets of extra CLI flags per agent, used to shrink the fixed context of each call. */
 export type ContextPresets = Record<string, Partial<Record<AgentName, string[]>>>;
 
+/** What a role needs from the agent that runs it. */
+export type Capability = "image";
+
+export interface RoleConfig {
+  /** the instructions that define the role */
+  prompt: string;
+  /** pin the role to an agent; otherwise normal routing applies */
+  agent?: AgentName;
+  model?: string;
+  effort?: string;
+  /** name of a `contexts` preset */
+  context?: string;
+  needs: Capability[];
+  /** may the role change project files */
+  writes: boolean;
+  /** extra argv per agent, for example permission flags for roles that write */
+  agentArgs?: Partial<Record<AgentName, string[]>>;
+}
+
 export interface Config {
   defaultAgent: AgentName;
   agents: Record<AgentName, AgentConfig>;
   rules: RouteRule[];
   contexts: ContextPresets;
+  roles: Record<string, RoleConfig>;
+  /** team name to role names */
+  teams: Record<string, string[]>;
+  pipeline: { handoffChars: number };
 }
 
 export interface RunResult {
@@ -93,11 +116,15 @@ export interface Attempt {
 }
 
 export interface TaskResult {
-  status: "ok" | "failed" | "rejected" | "unavailable";
+  status: "ok" | "failed" | "rejected" | "unavailable" | "planned";
   agent: AgentName | null;
   output: string;
   failedOver: boolean;
   attempts: Attempt[];
+  /** per-role outcomes of a team run */
+  roles?: RoleResult[];
+  /** the plan of a dry run */
+  plan?: PlanStep[];
   /** true when the final answer was already forwarded through onChunk */
   streamed?: boolean;
   /** token usage of the final attempt, when the agent reported it */
@@ -113,4 +140,19 @@ export interface JobEntry {
   promptPreview: string;
   model?: string;
   context?: string;
+}
+
+export interface RoleResult {
+  role: string;
+  agent: AgentName | null;
+  status: "ok" | "failed" | "skipped" | "not-run";
+  reason?: string;
+  artifact?: string;
+  usage?: Usage;
+}
+
+export interface PlanStep {
+  role: string;
+  agent: AgentName | null;
+  skipReason?: string;
 }

@@ -2,9 +2,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { parse, stringify } from "yaml";
-import type { AgentConfig, AgentName, Config, ContextPresets, OutputKind } from "./types.js";
+import type { AgentConfig, AgentName, Capability, Config, ContextPresets, OutputKind, RoleConfig } from "./types.js";
 
 export const AGENT_NAMES: AgentName[] = ["claude", "codex"];
+const CAPABILITIES: Capability[] = ["image"];
 const OUTPUT_KINDS: OutputKind[] = ["claude-json", "codex-jsonl", "text"];
 
 const LIMIT_PATTERNS = [
@@ -65,6 +66,31 @@ export const DEFAULT_CONFIG: Config = {
       ],
     },
   },
+  roles: {
+    developer: {
+      prompt:
+        "You are the developer. Implement the task below with the smallest change that satisfies it. Edit the project files directly, follow the project's existing conventions, and do not add unrelated changes.",
+      needs: [],
+      writes: true,
+      agentArgs: { claude: ["--permission-mode", "acceptEdits"], codex: ["-s", "workspace-write"] },
+    },
+    tester: {
+      prompt:
+        "You are the tester. Add or update automated tests for the task below and for the changes already made in the working tree. Change test files only, never application code. Run the tests only if the project already has them set up.",
+      needs: [],
+      writes: true,
+      agentArgs: { claude: ["--permission-mode", "acceptEdits"], codex: ["-s", "workspace-write"] },
+    },
+    reviewer: {
+      prompt:
+        "You are a code reviewer. Review the working-tree changes (use git status and git diff) against the task below. Report bugs, risky behavior and missing tests, most serious first, with file and line. Do not modify any files.",
+      context: "lean",
+      needs: [],
+      writes: false,
+    },
+  },
+  teams: { quick: ["developer"], standard: ["developer", "tester", "reviewer"] },
+  pipeline: { handoffChars: 4000 },
   rules: [
     { match: "refactor|architecture|migrate|redesign", agent: "claude" },
     { match: "typo|rename|quick|small fix|one-liner", agent: "codex" },
@@ -101,6 +127,20 @@ function mergeContexts(user: unknown): ContextPresets {
   return merged;
 }
 
+/** User roles add to or override the built-in ones, per role name and per key. */
+function mergeRoles(user: unknown): Record<string, RoleConfig> {
+  const merged: Record<string, RoleConfig> = structuredClone(DEFAULT_CONFIG.roles);
+  if (user && typeof user === "object") {
+    for (const [name, role] of Object.entries(user as Record<string, Record<string, unknown>>)) {
+      const base = merged[name] ?? { needs: [], writes: false };
+      const next = { ...base, ...(role ?? {}) } as RoleConfig;
+      if (role?.agentArgs && base.agentArgs) next.agentArgs = { ...base.agentArgs, ...(role.agentArgs as object) };
+      merged[name] = next;
+    }
+  }
+  return merged;
+}
+
 export function loadConfig(path?: string): Config {
   const file = path ?? process.env.ORCH_CONFIG ?? join(orchHome(), "config.yaml");
   if (!existsSync(file)) return structuredClone(DEFAULT_CONFIG);
@@ -113,6 +153,9 @@ export function loadConfig(path?: string): Config {
     },
     rules: raw.rules ?? structuredClone(DEFAULT_CONFIG.rules),
     contexts: mergeContexts(raw.contexts),
+    roles: mergeRoles(raw.roles),
+    teams: { ...structuredClone(DEFAULT_CONFIG.teams), ...(raw.teams ?? {}) },
+    pipeline: { ...DEFAULT_CONFIG.pipeline, ...(raw.pipeline ?? {}) },
   };
   validate(cfg);
   return cfg;
@@ -140,6 +183,39 @@ function validate(cfg: Config): void {
         throw new Error(`contexts.${name}.${agent} must be a list of strings`);
       }
     }
+  }
+  for (const [name, role] of Object.entries(cfg.roles)) {
+    const at = `roles.${name}`;
+    if (!role || typeof role !== "object" || typeof role.prompt !== "string" || !role.prompt.trim()) {
+      throw new Error(`${at}.prompt is required`);
+    }
+    if (role.agent !== undefined && !AGENT_NAMES.includes(role.agent)) {
+      throw new Error(`${at}.agent must be one of ${AGENT_NAMES.join(", ")}`);
+    }
+    if (role.context !== undefined && !Object.hasOwn(cfg.contexts, role.context)) {
+      throw new Error(`${at}.context "${role.context}" is not a defined context`);
+    }
+    if (!Array.isArray(role.needs) || !role.needs.every((n) => CAPABILITIES.includes(n))) {
+      throw new Error(`${at}.needs must list capabilities from: ${CAPABILITIES.join(", ")}`);
+    }
+    if (role.needs.includes("image") && role.agent !== undefined && role.agent !== "codex") {
+      throw new Error(`${at}: a role that needs image must use agent codex`);
+    }
+    if (typeof role.writes !== "boolean") throw new Error(`${at}.writes must be true or false`);
+    for (const [agent, args] of Object.entries(role.agentArgs ?? {})) {
+      if (!AGENT_NAMES.includes(agent as AgentName) || !Array.isArray(args) || !args.every((a) => typeof a === "string")) {
+        throw new Error(`${at}.agentArgs.${agent} must be a list of strings for claude or codex`);
+      }
+    }
+  }
+  for (const [team, names] of Object.entries(cfg.teams)) {
+    if (!Array.isArray(names)) throw new Error(`teams.${team} must be a list of role names`);
+    for (const r of names) {
+      if (!Object.hasOwn(cfg.roles, r)) throw new Error(`teams.${team} names unknown role "${r}"`);
+    }
+  }
+  if (!Number.isInteger(cfg.pipeline.handoffChars) || cfg.pipeline.handoffChars <= 0) {
+    throw new Error("pipeline.handoffChars must be a positive integer");
   }
   for (const rule of cfg.rules) {
     if (rule.context !== undefined && !Object.hasOwn(cfg.contexts, rule.context)) {

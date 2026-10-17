@@ -123,6 +123,45 @@ describe("loadConfig", () => {
     expect(() => loadConfig(tmpFile('contexts:\n  bad:\n    claude: "--x"\n'))).toThrow(/contexts\.bad/);
   });
 
+  it("ships the developer, tester and reviewer roles and the quick and standard teams", () => {
+    expect(Object.keys(DEFAULT_CONFIG.roles).sort()).toEqual(["developer", "reviewer", "tester"]);
+    expect(DEFAULT_CONFIG.roles.developer.writes).toBe(true);
+    expect(DEFAULT_CONFIG.roles.developer.agentArgs?.claude).toEqual(["--permission-mode", "acceptEdits"]);
+    expect(DEFAULT_CONFIG.roles.reviewer).toMatchObject({ context: "lean", writes: false, needs: [] });
+    expect(DEFAULT_CONFIG.teams).toEqual({ quick: ["developer"], standard: ["developer", "tester", "reviewer"] });
+    expect(DEFAULT_CONFIG.pipeline.handoffChars).toBe(4000);
+  });
+
+  it("merges user roles and teams over the defaults by name and key", () => {
+    const cfg = loadConfig(
+      tmpFile(
+        'roles:\n  mine:\n    prompt: hi\n  reviewer:\n    model: haiku\nteams:\n  docs: [reviewer]\n',
+      ),
+    );
+    expect(cfg.roles.mine).toEqual({ prompt: "hi", needs: [], writes: false });
+    expect(cfg.roles.reviewer).toMatchObject({ model: "haiku", context: "lean", writes: false });
+    expect(cfg.roles.reviewer.prompt).toBe(DEFAULT_CONFIG.roles.reviewer.prompt);
+    expect(cfg.teams.docs).toEqual(["reviewer"]);
+    expect(cfg.teams.standard).toEqual(DEFAULT_CONFIG.teams.standard);
+  });
+
+  it("rejects invalid roles, teams and pipeline settings, naming the key", () => {
+    const bad = (yaml: string, re: RegExp) => expect(() => loadConfig(tmpFile(yaml))).toThrow(re);
+    bad("roles:\n  x:\n    writes: false\n", /roles\.x\.prompt/);
+    bad("roles:\n  x:\n    prompt: p\n    agent: gemini\n", /roles\.x\.agent/);
+    bad("roles:\n  x:\n    prompt: p\n    context: nope\n", /roles\.x\.context/);
+    bad("roles:\n  x:\n    prompt: p\n    needs: [video]\n", /roles\.x\.needs/);
+    bad("roles:\n  x:\n    prompt: p\n    needs: [image]\n    agent: claude\n", /roles\.x.*image/);
+    bad("teams:\n  t: [nope]\n", /teams\.t.*nope/);
+    bad("pipeline:\n  handoffChars: 0\n", /handoffChars/);
+    bad('pipeline:\n  handoffChars: "x"\n', /handoffChars/);
+  });
+
+  it("accepts an image role without an agent (it is pinned to codex at run time)", () => {
+    const cfg = loadConfig(tmpFile("roles:\n  pic:\n    prompt: p\n    needs: [image]\n"));
+    expect(cfg.roles.pic.needs).toEqual(["image"]);
+  });
+
   it("rejects an invalid auth pattern", () => {
     expect(() =>
       loadConfig(tmpFile('agents:\n  claude:\n    authPatterns: ["("]\n')),

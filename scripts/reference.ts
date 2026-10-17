@@ -20,6 +20,8 @@ export function renderConfigReference(cfg: Config): string {
     ...sections,
     "# Context presets\n\nExtra flags per agent that shrink the fixed context of every call. Select one with `context:` in a rule, `orch run --context NAME`, or the MCP `context` parameter. Presets are off unless selected.",
     fence("yaml", stringify({ contexts: cfg.contexts })),
+    "# Roles\n\nBuilt-in roles and teams. Select a role with `--role`, a team with `--team`, or a list with `--roles`; a role is one ordinary run with its own prompt, agent, model and context.",
+    fence("yaml", stringify({ roles: cfg.roles, teams: cfg.teams, pipeline: cfg.pipeline })),
     "# Routing rules\n\nFirst matching rule wins; no match uses the default agent.",
     fence("yaml", stringify({ rules: cfg.rules })),
     "# Environment variables",
