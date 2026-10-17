@@ -54,6 +54,14 @@ describe("parseArgs", () => {
     expect(parseArgs(["run", "x"])).not.toHaveProperty("sequential");
   });
 
+  it("treats everything after -- as the prompt, even if it looks like a flag", () => {
+    expect(parseArgs(["run", "--team", "standard", "--", "explain", "--dry-run", "and", "--keep-going"])).toMatchObject({
+      name: "run", team: "standard", prompt: "explain --dry-run and --keep-going",
+    });
+    expect(parseArgs(["run", "--", "--role"])).toMatchObject({ prompt: "--role" });
+    expect(parseArgs(["run", "--", "--role"])).not.toHaveProperty("dryRun");
+  });
+
   it("parses --auto, --no-auto and explain", () => {
     expect(parseArgs(["run", "--auto", "fix", "it"])).toMatchObject({ name: "run", prompt: "fix it", auto: true });
     expect(parseArgs(["run", "--no-auto", "fix", "it"])).toMatchObject({ auto: false });

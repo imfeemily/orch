@@ -80,8 +80,20 @@ function prepareAssets(cwd: string, runId: string, needed: boolean): { rel: stri
   return { rel, abs };
 }
 
+/** Keeps .orch/runs out of git from the first moment, so a role that runs while another writes assets does not see them as new files. */
+function ensureRunsIgnore(cwd: string): void {
+  try {
+    const runs = join(cwd, ".orch", "runs");
+    mkdirSync(runs, { recursive: true });
+    writeFileSync(join(runs, ".gitignore"), "*\n", { flag: "wx" });
+  } catch {
+    /* already there, or not writable: roles still run */
+  }
+}
+
 /** Saves a role's full answer under .orch/runs/<id>/; any filesystem problem just means no artifact. */
 function writeArtifact(cwd: string, runId: string, role: string, output: string): string | undefined {
+  if (output === "") return undefined;
   try {
     const runs = join(cwd, ".orch", "runs");
     const dir = join(runs, runId);
@@ -105,6 +117,9 @@ function writeArtifact(cwd: string, runId: string, role: string, output: string)
  */
 export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskResult> {
   const { config } = deps;
+  if (req.context !== undefined && !Object.hasOwn(config.contexts, req.context)) {
+    return rejected(`unknown context "${req.context}"; available: ${Object.keys(config.contexts).join(", ") || "(none)"}`);
+  }
   const noSelector = req.role === undefined && req.roles === undefined && req.team === undefined;
   if (noSelector) {
     const flags = [req.dryRun && "--dry-run", req.requireCodex && "--require-codex", req.keepGoing && "--keep-going", req.sequential && "--sequential"].filter(Boolean);
@@ -168,6 +183,7 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
       return { ...rejected(`role "${step.role}" cannot run: ${step.skipReason}`), status: "failed" };
     }
     const role = config.roles[step.role];
+    if (role.needs.length > 0) ensureRunsIgnore(req.cwd);
     const assets = prepareAssets(req.cwd, runId, role.needs.length > 0);
     const prompt = buildRolePrompt(role, req.task, [], false, assets?.rel);
     const result = await runTask(deps, {
@@ -183,6 +199,7 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
     return assets ? { ...result, assets: listAssets(assets.abs) } : result;
   }
 
+  ensureRunsIgnore(req.cwd);
   const results: RoleResult[] = [];
   const outputsByRole = new Map<string, string>();
   const attempts: TaskResult["attempts"] = [];
@@ -193,13 +210,14 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
   let lastAgent: AgentName | null = null;
   const messages: string[] = [];
 
-  // Roles skipped when the plan was made do not take a place in any batch.
-  for (const step of steps.filter((s) => s.skipReason)) {
+  // In parallel mode, roles skipped when the plan was made take no place in any batch and are recorded
+  // up front. One at a time, they stay in plan order so an earlier failure or abort marks them not-run.
+  for (const step of parallelOn ? steps.filter((s) => s.skipReason) : []) {
     results.push({ role: step.role, agent: step.agent, status: "skipped", reason: step.skipReason });
     messages.push(`role "${step.role}" skipped: ${step.skipReason}`);
   }
 
-  for (const group of groupSteps(steps.filter((s) => !s.skipReason), config, parallelOn)) {
+  for (const group of groupSteps(parallelOn ? steps.filter((s) => !s.skipReason) : steps, config, parallelOn)) {
     if (req.signal?.aborted) aborted = true;
     if (aborted) {
       for (const step of group) results.push({ role: step.role, agent: step.agent, status: "not-run", reason: "cancelled" });
@@ -238,15 +256,21 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
         const role = config.roles[step.role];
         const assets = prepareAssets(req.cwd, runId, role.needs.length > 0);
         const prompt = buildRolePrompt(role, req.task, snapshot, true, assets?.rel);
-        const r = await runTask(deps, {
-          prompt,
-          cwd: req.cwd,
-          depth: req.depth,
-          role: step.role,
-          runId,
-          context: req.context,
-          signal: req.signal,
-        });
+        let r: TaskResult;
+        try {
+          r = await runTask(deps, {
+            prompt,
+            cwd: req.cwd,
+            depth: req.depth,
+            role: step.role,
+            runId,
+            context: req.context,
+            signal: req.signal,
+          });
+        } catch (e) {
+          // a call that throws fails its role; it must not take its siblings' results with it
+          r = { status: "failed", agent: step.agent, output: "", failedOver: false, attempts: [], message: e instanceof Error ? e.message : String(e) };
+        }
         return { step, assets, r };
       }),
     );
@@ -302,6 +326,8 @@ export async function runAuto(deps: TeamDeps, req: TeamRequest): Promise<TaskRes
   const selection = { roles: sel.roles, reasons: sel.reasons, dropped: sel.dropped };
 
   if (sel.roles.length === 0) {
+    const moot = [req.requireCodex && "--require-codex", req.keepGoing && "--keep-going", req.sequential && "--sequential"].filter(Boolean);
+    if (moot.length > 0) selection.reasons.push(`${moot.join(", ")} ignored: no roles were selected`);
     if (req.dryRun) {
       return {
         status: "planned",
