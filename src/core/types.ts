@@ -74,6 +74,14 @@ export interface RoleConfig {
   agentArgs?: Partial<Record<AgentName, string[]>>;
 }
 
+/** Automatic role selection (no model call; keyword rules). */
+export interface AutoConfig {
+  enabled: boolean;
+  maxRoles: number;
+  /** extra words per role, added to the built-in lists */
+  keywords?: Record<string, string[]>;
+}
+
 export interface Config {
   defaultAgent: AgentName;
   agents: Record<AgentName, AgentConfig>;
@@ -83,6 +91,7 @@ export interface Config {
   /** team name to role names */
   teams: Record<string, string[]>;
   pipeline: { handoffChars: number };
+  auto: AutoConfig;
 }
 
 export interface RunResult {

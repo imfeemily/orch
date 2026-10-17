@@ -123,13 +123,45 @@ describe("loadConfig", () => {
     expect(() => loadConfig(tmpFile('contexts:\n  bad:\n    claude: "--x"\n'))).toThrow(/contexts\.bad/);
   });
 
-  it("ships the developer, tester and reviewer roles and the quick and standard teams", () => {
-    expect(Object.keys(DEFAULT_CONFIG.roles).sort()).toEqual(["developer", "reviewer", "tester"]);
+  it("ships six roles and the quick, standard and full teams", () => {
+    expect(Object.keys(DEFAULT_CONFIG.roles).sort()).toEqual(["architecture", "designer", "developer", "reviewer", "security", "tester"]);
     expect(DEFAULT_CONFIG.roles.developer.writes).toBe(true);
     expect(DEFAULT_CONFIG.roles.developer.agentArgs?.claude).toEqual(["--permission-mode", "acceptEdits"]);
     expect(DEFAULT_CONFIG.roles.reviewer).toMatchObject({ context: "lean", writes: false, needs: [] });
-    expect(DEFAULT_CONFIG.teams).toEqual({ quick: ["developer"], standard: ["developer", "tester", "reviewer"] });
+    expect(DEFAULT_CONFIG.teams).toEqual({
+      quick: ["developer"],
+      standard: ["developer", "tester", "reviewer"],
+      full: ["architecture", "designer", "developer", "tester", "reviewer", "security"],
+    });
     expect(DEFAULT_CONFIG.pipeline.handoffChars).toBe(4000);
+  });
+
+  it("pins the designer to codex with image capability and a writable sandbox for its assets", () => {
+    const d = DEFAULT_CONFIG.roles.designer;
+    expect(d).toMatchObject({ needs: ["image"], agent: "codex", writes: false });
+    expect(d.agentArgs?.codex).toEqual(["-s", "workspace-write"]);
+    for (const name of ["architecture", "security"]) {
+      expect(DEFAULT_CONFIG.roles[name]).toMatchObject({ context: "lean", writes: false, needs: [] });
+    }
+  });
+
+  it("ships auto selection off, capped at three roles, and merges user settings", () => {
+    expect(DEFAULT_CONFIG.auto).toEqual({ enabled: false, maxRoles: 3 });
+    const cfg = loadConfig(tmpFile("auto:\n  enabled: true\n  maxRoles: 2\n  keywords:\n    security: [pii]\n"));
+    expect(cfg.auto).toEqual({ enabled: true, maxRoles: 2, keywords: { security: ["pii"] } });
+    expect(loadConfig(tmpFile("auto:\n  maxRoles: 5\n")).auto).toEqual({ enabled: false, maxRoles: 5 });
+  });
+
+  it("rejects unsafe role names, empty teams, non-mapping roles and a bad auto block", () => {
+    const bad = (yaml: string, re: RegExp) => expect(() => loadConfig(tmpFile(yaml))).toThrow(re);
+    bad("roles:\n  ../x:\n    prompt: p\n", /role name/);
+    bad("roles:\n  a/b:\n    prompt: p\n", /role name/);
+    bad("teams:\n  t: []\n", /teams\.t.*at least one/);
+    bad("roles:\n  reviewer: just some text\n", /roles\.reviewer.*mapping/);
+    bad('auto:\n  enabled: "yes"\n', /auto\.enabled/);
+    bad("auto:\n  maxRoles: 0\n", /auto\.maxRoles/);
+    bad("auto:\n  keywords:\n    wizard: [x]\n", /auto\.keywords.*wizard/);
+    bad("auto:\n  keywords:\n    security: pii\n", /auto\.keywords\.security/);
   });
 
   it("merges user roles and teams over the defaults by name and key", () => {

@@ -81,6 +81,28 @@ export const DEFAULT_CONFIG: Config = {
       writes: true,
       agentArgs: { claude: ["--permission-mode", "acceptEdits"], codex: ["-s", "workspace-write"] },
     },
+    architecture: {
+      prompt:
+        "You are the software architect. Analyse the task below and the repository. Describe the design, the module boundaries it touches and the main risks. When a picture helps, include a Mermaid diagram in a fenced code block. Do not modify any files.",
+      context: "lean",
+      needs: [],
+      writes: false,
+    },
+    designer: {
+      prompt:
+        "You are a UX/UI designer. Create mockup or diagram images for the task below. Save image files only into the assets directory named at the end of this prompt, and do not change any project files. Reply with the file paths and a short description of each image.",
+      agent: "codex",
+      needs: ["image"],
+      writes: false,
+      agentArgs: { codex: ["-s", "workspace-write"] },
+    },
+    security: {
+      prompt:
+        "You are a security reviewer. Review the working-tree changes (use git status and git diff) against the task below for security problems such as injection, broken authorization, exposed secrets, unsafe dependencies and data exposure. Report the most serious first, with file and line. Do not modify any files.",
+      context: "lean",
+      needs: [],
+      writes: false,
+    },
     reviewer: {
       prompt:
         "You are a code reviewer. Review the working-tree changes (use git status and git diff) against the task below. Report bugs, risky behavior and missing tests, most serious first, with file and line. Do not modify any files.",
@@ -89,8 +111,13 @@ export const DEFAULT_CONFIG: Config = {
       writes: false,
     },
   },
-  teams: { quick: ["developer"], standard: ["developer", "tester", "reviewer"] },
+  teams: {
+    quick: ["developer"],
+    standard: ["developer", "tester", "reviewer"],
+    full: ["architecture", "designer", "developer", "tester", "reviewer", "security"],
+  },
   pipeline: { handoffChars: 4000 },
+  auto: { enabled: false, maxRoles: 3 },
   rules: [
     { match: "refactor|architecture|migrate|redesign", agent: "claude" },
     { match: "typo|rename|quick|small fix|one-liner", agent: "codex" },
@@ -132,6 +159,9 @@ function mergeRoles(user: unknown): Record<string, RoleConfig> {
   const merged: Record<string, RoleConfig> = structuredClone(DEFAULT_CONFIG.roles);
   if (user && typeof user === "object") {
     for (const [name, role] of Object.entries(user as Record<string, Record<string, unknown>>)) {
+      if (role !== null && role !== undefined && (typeof role !== "object" || Array.isArray(role))) {
+        throw new Error(`roles.${name} must be a mapping of role settings`);
+      }
       const base = merged[name] ?? { needs: [], writes: false };
       const next = { ...base, ...(role ?? {}) } as RoleConfig;
       if (role?.agentArgs && base.agentArgs) next.agentArgs = { ...base.agentArgs, ...(role.agentArgs as object) };
@@ -156,6 +186,7 @@ export function loadConfig(path?: string): Config {
     roles: mergeRoles(raw.roles),
     teams: { ...structuredClone(DEFAULT_CONFIG.teams), ...(raw.teams ?? {}) },
     pipeline: { ...DEFAULT_CONFIG.pipeline, ...(raw.pipeline ?? {}) },
+    auto: { ...DEFAULT_CONFIG.auto, ...(raw.auto ?? {}) },
   };
   validate(cfg);
   return cfg;
@@ -185,6 +216,9 @@ function validate(cfg: Config): void {
     }
   }
   for (const [name, role] of Object.entries(cfg.roles)) {
+    if (!/^[a-z0-9_-]+$/i.test(name)) {
+      throw new Error(`role name "${name}" may only contain letters, digits, "-" and "_"`);
+    }
     const at = `roles.${name}`;
     if (!role || typeof role !== "object" || typeof role.prompt !== "string" || !role.prompt.trim()) {
       throw new Error(`${at}.prompt is required`);
@@ -210,8 +244,18 @@ function validate(cfg: Config): void {
   }
   for (const [team, names] of Object.entries(cfg.teams)) {
     if (!Array.isArray(names)) throw new Error(`teams.${team} must be a list of role names`);
+    if (names.length === 0) throw new Error(`teams.${team} must name at least one role`);
     for (const r of names) {
       if (!Object.hasOwn(cfg.roles, r)) throw new Error(`teams.${team} names unknown role "${r}"`);
+    }
+  }
+  const auto = cfg.auto;
+  if (typeof auto.enabled !== "boolean") throw new Error("auto.enabled must be true or false");
+  if (!Number.isInteger(auto.maxRoles) || auto.maxRoles <= 0) throw new Error("auto.maxRoles must be a positive integer");
+  for (const [role, words] of Object.entries(auto.keywords ?? {})) {
+    if (!Object.hasOwn(cfg.roles, role)) throw new Error(`auto.keywords names unknown role "${role}"`);
+    if (!Array.isArray(words) || !words.every((w) => typeof w === "string")) {
+      throw new Error(`auto.keywords.${role} must be a list of strings`);
     }
   }
   if (!Number.isInteger(cfg.pipeline.handoffChars) || cfg.pipeline.handoffChars <= 0) {

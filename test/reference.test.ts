@@ -28,6 +28,7 @@ describe("renderConfigReference", () => {
 
   it("lists the roles and teams", () => {
     expect(md).toContain("Roles");
+    for (const name of ["architecture", "designer", "security", "auto"]) expect(md).toContain(name);
     for (const name of [...Object.keys(DEFAULT_CONFIG.roles), ...Object.keys(DEFAULT_CONFIG.teams)]) {
       expect(md).toContain(name);
     }
