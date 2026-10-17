@@ -14,15 +14,20 @@ const FAIL: RunResult = { exitCode: 2, stdout: "", stderr: "boom" };
 const READY: ReadinessChecker = async () => ({ ready: true, reasons: [] });
 const NOT_READY: ReadinessChecker = async () => ({ ready: false, reasons: ["not logged in: run `codex login`"] });
 
-function setup(outputs: Record<string, RunResult>, opts: { readiness?: ReadinessChecker; tweak?: (c: Config) => void } = {}) {
+function setup(
+  outputs: Record<string, RunResult>,
+  opts: { readiness?: ReadinessChecker; tweak?: (c: Config) => void; onRun?: (role: string, prompt: string, cwd: string) => void } = {},
+) {
   const config = noSummaryConfig();
   config.roles.pic = { prompt: "You are the picture maker.", needs: ["image"], writes: false };
   opts.tweak?.(config);
   const calls: { command: string; prompt: string; role: string }[] = [];
+  const cwdRef = { value: "" };
   let abort: (() => void) | undefined;
   const run: RunFn = async (command, _args, prompt) => {
     const role = Object.keys(config.roles).find((r) => prompt.includes(config.roles[r].prompt)) ?? "?";
     calls.push({ command, prompt, role });
+    opts.onRun?.(role, prompt, cwdRef.value);
     const r = outputs[role] ?? ok(`${role} output\n## Handoff\n${role} handoff`);
     if (role === "developer") abort?.();
     return r;
@@ -30,6 +35,7 @@ function setup(outputs: Record<string, RunResult>, opts: { readiness?: Readiness
   const dir = mkdtempSync(join(tmpdir(), "orch-"));
   const cwd = join(dir, "project");
   mkdirSync(cwd);
+  cwdRef.value = cwd;
   const state = new StateStore(join(dir, "s.json"));
   const ledger = new Ledger(join(dir, "usage.jsonl"));
   const ac = new AbortController();
@@ -126,6 +132,49 @@ describe("runRoles: team", () => {
     const r = await go(s, { team: "standard" });
     expect(r.status).toBe("ok");
     expect(r.roles!.every((x) => x.artifact === undefined)).toBe(true);
+  });
+});
+
+const assetsOf = (prompt: string) => /(\.orch\/runs\/[a-z0-9-]+\/assets)/.exec(prompt)?.[1];
+
+describe("runRoles: image roles and assets", () => {
+  const writeImage = (role: string, prompt: string, cwd: string) => {
+    const rel = assetsOf(prompt);
+    if (role === "pic" && rel) writeFileSync(join(cwd, rel, "mockup.png"), "png-bytes");
+  };
+
+  it("creates the assets directory, names it in the prompt and reports the files the role left", async () => {
+    const s = setup({}, { onRun: writeImage });
+    const r = await go(s, { roles: ["developer", "pic"] });
+    const pic = s.calls.find((c) => c.role === "pic")!;
+    expect(pic.prompt).toContain("## Assets directory");
+    expect(assetsOf(pic.prompt)).toMatch(/^\.orch\/runs\/[a-z0-9-]+\/assets$/);
+    expect(r.roles![1].assets!.map((p) => p.split("/").pop())).toEqual(["mockup.png"]);
+    expect(s.calls.find((c) => c.role === "developer")!.prompt).not.toContain("## Assets directory");
+    expect(r.roles![0].assets).toBeUndefined();
+  });
+
+  it("reports an empty list when the role left no files, and never invents files from its text", async () => {
+    const s = setup({ pic: ok("I saved /tmp/fake.png\n## Handoff\ndone") });
+    const r = await go(s, { roles: ["pic"] });
+    expect(r.roles![0].assets).toEqual([]);
+  });
+
+  it("does the same for a single image role", async () => {
+    const s = setup({}, { onRun: writeImage });
+    const r = await go(s, { role: "pic" });
+    expect(assetsOf(s.calls[0].prompt)).toBeDefined();
+    expect(r.assets!.map((p) => p.split("/").pop())).toEqual(["mockup.png"]);
+  });
+
+  it("skips an image role when the context preset disables image generation, in the plan and at run time", async () => {
+    const s = setup({});
+    const dry = await go(s, { roles: ["pic"] }, { dryRun: true, context: "minimal" });
+    expect(dry.plan![0].skipReason).toContain("context preset disables image generation");
+    const run = await go(s, { roles: ["developer", "pic"] }, { context: "minimal" });
+    expect(run.roles![1]).toMatchObject({ role: "pic", status: "skipped" });
+    expect(run.roles![1].reason).toContain("disables image generation");
+    expect(s.calls.map((c) => c.role)).toEqual(["developer"]);
   });
 });
 

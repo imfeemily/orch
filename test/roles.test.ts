@@ -48,6 +48,13 @@ describe("buildRolePrompt", () => {
     expect(p).not.toContain("## Handoff");
   });
 
+  it("ends with the assets directory section only when a directory is given", () => {
+    const p = buildRolePrompt(role, "draw it", [], false, ".orch/runs/abc123/assets");
+    expect(p.endsWith("and nowhere else.")).toBe(true);
+    expect(p).toContain("## Assets directory\n.orch/runs/abc123/assets");
+    expect(buildRolePrompt(role, "draw it", [], false)).not.toContain("## Assets directory");
+  });
+
   it("adds earlier roles' handoffs and the handoff instruction when asked", () => {
     const p = buildRolePrompt(role, "t", [{ role: "developer", text: "changed math.ts" }], true);
     expect(p).toContain("## Earlier roles\n### developer\nchanged math.ts");

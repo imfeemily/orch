@@ -130,6 +130,8 @@ export interface TaskResult {
   output: string;
   failedOver: boolean;
   attempts: Attempt[];
+  /** files a single image role left in its assets directory */
+  assets?: string[];
   /** per-role outcomes of a team run */
   roles?: RoleResult[];
   /** the plan of a dry run */
@@ -158,6 +160,8 @@ export interface RoleResult {
   status: "ok" | "failed" | "skipped" | "not-run";
   reason?: string;
   artifact?: string;
+  /** files an image role left in its assets directory (listed from disk, not from model text) */
+  assets?: string[];
   usage?: Usage;
 }
 

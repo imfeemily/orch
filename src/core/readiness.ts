@@ -33,6 +33,15 @@ export const spawnRunner: CommandRunner = (command, args) =>
     child.on("close", (code) => finish(code));
   });
 
+/** Why a context preset's flags stop a role from using a capability, if they do. */
+export function contextBlocks(args: string[] | undefined, needs: Capability[]): string | undefined {
+  if (!args || !needs.includes("image")) return undefined;
+  for (let i = 0; i < args.length - 1; i++) {
+    if (args[i] === "--disable" && args[i + 1] === "image_generation") return "context preset disables image generation";
+  }
+  return undefined;
+}
+
 const LOGIN_HINT: Record<AgentName, string> = {
   claude: "not logged in: run `claude`, then /login",
   codex: "not logged in: run `codex login`",

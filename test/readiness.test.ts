@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "../src/core/config.js";
-import { type CommandRunner, createReadinessChecker } from "../src/core/readiness.js";
+import { type CommandRunner, contextBlocks, createReadinessChecker } from "../src/core/readiness.js";
 
 type Reply = { exitCode: number | null; stdout?: string };
 
@@ -95,5 +95,20 @@ describe("createReadinessChecker", () => {
     t += 61_000;
     await m.check("codex");
     expect(m.calls.length).toBe(first * 2);
+  });
+});
+
+describe("contextBlocks", () => {
+  it("blocks an image role when the preset disables image generation", () => {
+    expect(contextBlocks(["--disable", "hooks", "--disable", "image_generation"], ["image"])).toBe(
+      "context preset disables image generation",
+    );
+  });
+
+  it("does not block without the capability, for other features, or without args", () => {
+    expect(contextBlocks(["--disable", "image_generation"], [])).toBeUndefined();
+    expect(contextBlocks(["--disable", "hooks"], ["image"])).toBeUndefined();
+    expect(contextBlocks(["image_generation"], ["image"])).toBeUndefined();
+    expect(contextBlocks(undefined, ["image"])).toBeUndefined();
   });
 });

@@ -47,13 +47,22 @@ export function planRoles(config: Config, sel: RoleSelection): { names: string[]
   return { names: [...members].sort((a, b) => rank(a) - rank(b)) };
 }
 
-export function buildRolePrompt(role: RoleConfig, task: string, handoffs: Handoff[], askHandoff: boolean): string {
+export function buildRolePrompt(
+  role: RoleConfig,
+  task: string,
+  handoffs: Handoff[],
+  askHandoff: boolean,
+  assetsDir?: string,
+): string {
   const parts = [role.prompt, `## Task\n${task}`];
   if (handoffs.length > 0) {
     parts.push(`## Earlier roles\n${handoffs.map((h) => `### ${h.role}\n${h.text}`).join("\n\n")}`);
   }
   if (askHandoff) {
     parts.push('Finish your answer with a "## Handoff" section of at most 150 words for the next role.');
+  }
+  if (assetsDir) {
+    parts.push(`## Assets directory\n${assetsDir}\nSave any image or diagram files here (create the directory if needed) and nowhere else.`);
   }
   return parts.join("\n\n");
 }

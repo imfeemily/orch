@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Deps, runTask } from "./orchestrator.js";
-import type { ReadinessChecker } from "./readiness.js";
+import { type ReadinessChecker, contextBlocks } from "./readiness.js";
 import { type Handoff, type RoleSelection, buildRolePrompt, capHandoffs, extractHandoff, planRoles } from "./roles.js";
 import { pickRoleRoute } from "./router.js";
 import type { AgentName, PlanStep, RoleResult, TaskResult, Usage } from "./types.js";
@@ -21,6 +21,18 @@ export interface TeamRequest extends RoleSelection {
   dryRun?: boolean;
   requireCodex?: boolean;
   keepGoing?: boolean;
+}
+
+/** Files (not directories, not dotfiles) an image role left in its assets directory. */
+function listAssets(dir: string): string[] {
+  try {
+    return readdirSync(dir)
+      .filter((f) => !f.startsWith(".") && statSync(join(dir, f)).isFile())
+      .sort()
+      .map((f) => join(dir, f));
+  } catch {
+    return [];
+  }
 }
 
 const rejected = (message: string): TaskResult => ({
@@ -44,6 +56,19 @@ function sumUsage(usages: Array<Usage | undefined>): Usage | undefined {
     }),
     { inputTokens: 0, cacheReadTokens: 0, outputTokens: 0 },
   );
+}
+
+/** The assets directory of a run, created by orch for roles that need a capability. */
+function prepareAssets(cwd: string, runId: string, needed: boolean): { rel: string; abs: string } | undefined {
+  if (!needed) return undefined;
+  const rel = join(".orch", "runs", runId, "assets");
+  const abs = join(cwd, rel);
+  try {
+    mkdirSync(abs, { recursive: true });
+  } catch {
+    /* the role is still told where to save; listing will be empty */
+  }
+  return { rel, abs };
 }
 
 /** Saves a role's full answer under .orch/runs/<id>/; any filesystem problem just means no artifact. */
@@ -88,8 +113,13 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
     const agent = pickRoleRoute(config, role, req.task, () => false)?.agent ?? null;
     const step: PlanStep = { role: name, agent };
     if (role.needs.length > 0 && agent) {
-      const r = await deps.readiness(agent, role.needs);
-      if (!r.ready) step.skipReason = r.reasons.join("; ");
+      const blocked = contextBlocks(config.contexts[req.context ?? role.context ?? ""]?.[agent], role.needs);
+      if (blocked) {
+        step.skipReason = blocked;
+      } else {
+        const r = await deps.readiness(agent, role.needs);
+        if (!r.ready) step.skipReason = r.reasons.join("; ");
+      }
     }
     steps.push(step);
   }
@@ -120,8 +150,10 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
     if (step.skipReason) {
       return { ...rejected(`role "${step.role}" cannot run: ${step.skipReason}`), status: "failed" };
     }
-    const prompt = buildRolePrompt(config.roles[step.role], req.task, [], false);
-    return runTask(deps, {
+    const role = config.roles[step.role];
+    const assets = prepareAssets(req.cwd, runId, role.needs.length > 0);
+    const prompt = buildRolePrompt(role, req.task, [], false, assets?.rel);
+    const result = await runTask(deps, {
       prompt,
       cwd: req.cwd,
       depth: req.depth,
@@ -131,6 +163,7 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
       signal: req.signal,
       onChunk: req.onChunk,
     });
+    return assets ? { ...result, assets: listAssets(assets.abs) } : result;
   }
 
   const results: RoleResult[] = [];
@@ -156,8 +189,13 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
     const role = config.roles[step.role];
     if (!step.skipReason && role.needs.length > 0 && step.agent) {
       // An earlier role may have hit a rate limit since the plan was made: check again, do not fail.
-      const now = await deps.readiness(step.agent, role.needs);
-      if (!now.ready) step.skipReason = now.reasons.join("; ");
+      const blocked = contextBlocks(config.contexts[req.context ?? role.context ?? ""]?.[step.agent], role.needs);
+      if (blocked) {
+        step.skipReason = blocked;
+      } else {
+        const now = await deps.readiness(step.agent, role.needs);
+        if (!now.ready) step.skipReason = now.reasons.join("; ");
+      }
     }
     if (step.skipReason) {
       results.push({ role: step.role, agent: step.agent, status: "skipped", reason: step.skipReason });
@@ -165,7 +203,8 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
       continue;
     }
 
-    const prompt = buildRolePrompt(role, req.task, capHandoffs(handoffs, config.pipeline.handoffChars), true);
+    const assets = prepareAssets(req.cwd, runId, role.needs.length > 0);
+    const prompt = buildRolePrompt(role, req.task, capHandoffs(handoffs, config.pipeline.handoffChars), true, assets?.rel);
     const r = await runTask(deps, {
       prompt,
       cwd: req.cwd,
@@ -181,10 +220,10 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
     const artifact = writeArtifact(req.cwd, runId, step.role, r.output);
     if (r.status === "ok") {
       handoffs.push({ role: step.role, text: extractHandoff(r.output) });
-      results.push({ role: step.role, agent: r.agent, status: "ok", artifact, usage: r.usage });
+      results.push({ role: step.role, agent: r.agent, status: "ok", artifact, usage: r.usage, ...(assets ? { assets: listAssets(assets.abs) } : {}) });
     } else {
       failed = true;
-      results.push({ role: step.role, agent: r.agent, status: "failed", reason: r.message ?? r.status, artifact, usage: r.usage });
+      results.push({ role: step.role, agent: r.agent, status: "failed", reason: r.message ?? r.status, artifact, usage: r.usage, ...(assets ? { assets: listAssets(assets.abs) } : {}) });
       messages.push(`role "${step.role}" ${r.status}: ${r.message ?? ""}`.trim());
     }
     if (r.output) outputs.push(`## ${step.role}\n${r.output}`);
