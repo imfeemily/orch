@@ -30,13 +30,14 @@ server.tool(
     requireCodex: z.boolean().optional(),
     keepGoing: z.boolean().optional(),
     auto: z.boolean().optional(),
+    sequential: z.boolean().optional(),
   },
-  async ({ prompt, cwd, context, role, roles, team, dryRun, requireCodex, keepGoing, auto }) => {
+  async ({ prompt, cwd, context, role, roles, team, dryRun, requireCodex, keepGoing, auto, sequential }) => {
     await connectOrStart(sock);
     const depth = Number(process.env.ORCH_DEPTH ?? 0) || 0;
     const final = await sendRequest(
       sock,
-      { type: "run", prompt, cwd: resolve(cwd ?? process.cwd()), depth, context, role, roles, team, dryRun, requireCodex, keepGoing, auto },
+      { type: "run", prompt, cwd: resolve(cwd ?? process.cwd()), depth, context, role, roles, team, dryRun, requireCodex, keepGoing, auto, sequential },
       () => {},
     );
     if (final.type === "error") return text(final.message, true);

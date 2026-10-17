@@ -77,6 +77,13 @@ describe("mcp server", () => {
       arguments: { prompt: "implement login with a password reset token", cwd: home, auto: true },
     })) as { content: Array<{ text: string }> };
     expect(capped.content[0].text).toContain("dropped=reviewer");
+
+    const seq = (await client.callTool({
+      name: "orch_run",
+      arguments: { prompt: "review it", cwd: home, roles: ["reviewer", "security"], sequential: true },
+    })) as { content: Array<{ text: string }>; isError?: boolean };
+    expect(seq.isError).toBeFalsy();
+    expect(seq.content[0].text).toContain("roles=reviewer:ok,security:ok");
     expect(res.content[0].text).not.toContain("input_tokens");
   }, 20_000);
 });

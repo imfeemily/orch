@@ -92,6 +92,7 @@ async function main(): Promise<number> {
           requireCodex: cmd.requireCodex,
           keepGoing: cmd.keepGoing,
           auto: cmd.auto,
+          sequential: cmd.sequential,
         },
         (m) => {
           if (m.type === "chunk") process.stdout.write(m.text);

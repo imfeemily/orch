@@ -4,9 +4,11 @@ import type { TaskResult } from "../core/types.js";
 export function formatPlan(result: TaskResult): string {
   const steps = result.plan ?? [];
   const width = Math.max(0, ...steps.map((s) => s.role.length));
-  const lines = steps.map(
-    (s) => `  ${s.role.padEnd(width)}  ${s.agent ?? "-"}${s.skipReason ? `  skip: ${s.skipReason}` : ""}`,
-  );
+  const lines = steps.map((s) => {
+    const mates = s.group === undefined ? [] : steps.filter((o) => o.group === s.group && o !== s).map((o) => o.role);
+    const parallel = mates.length > 0 ? `  (parallel with ${mates.join(", ")})` : "";
+    return `  ${s.role.padEnd(width)}  ${s.agent ?? "-"}${s.skipReason ? `  skip: ${s.skipReason}` : ""}${parallel}`;
+  });
   return [`plan: ${result.message ?? ""}`.trimEnd(), ...lines].join("\n");
 }
 

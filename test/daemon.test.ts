@@ -125,6 +125,27 @@ describe("daemon", () => {
     expect(seen).toEqual(["fix the typo"]);
   });
 
+  it("runs read-only roles in parallel unless sequential is requested", async () => {
+    let inFlight = 0;
+    let max = 0;
+    const run: RunFn = async () => {
+      inFlight++;
+      max = Math.max(max, inFlight);
+      await new Promise((r) => setTimeout(r, 30));
+      inFlight--;
+      return { exitCode: 0, stdout: "ok", stderr: "" };
+    };
+    const s = setup(run);
+    closers.push((await startDaemon({ sockPath: s.sockPath, deps: s.deps })).close);
+    await sendRequest(s.sockPath, { type: "run", prompt: "x", cwd: s.dir, depth: 0, roles: ["reviewer", "security"] }, () => {});
+    expect(max).toBe(2);
+    max = 0;
+    await sendRequest(s.sockPath, { type: "run", prompt: "x", cwd: s.dir, depth: 0, roles: ["reviewer", "security"], sequential: true }, () => {});
+    expect(max).toBe(1);
+    const alone = await sendRequest(s.sockPath, { type: "run", prompt: "x", cwd: s.dir, depth: 0, sequential: true }, () => {});
+    expect(alone.type === "result" && alone.result.status).toBe("rejected");
+  });
+
   it("answers status", async () => {
     const s = setup(okRun);
     closers.push((await startDaemon({ sockPath: s.sockPath, deps: s.deps })).close);

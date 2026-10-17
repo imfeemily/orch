@@ -120,7 +120,7 @@ export async function runRoles(deps: TeamDeps, req: TeamRequest): Promise<TaskRe
   const { config } = deps;
   const noSelector = req.role === undefined && req.roles === undefined && req.team === undefined;
   if (noSelector) {
-    const flags = [req.dryRun && "--dry-run", req.requireCodex && "--require-codex", req.keepGoing && "--keep-going"].filter(Boolean);
+    const flags = [req.dryRun && "--dry-run", req.requireCodex && "--require-codex", req.keepGoing && "--keep-going", req.sequential && "--sequential"].filter(Boolean);
     if (flags.length > 0) return rejected(`${flags.join(", ")} need --role, --roles or --team`);
   }
   const planned = planRoles(config, req);

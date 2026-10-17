@@ -22,6 +22,24 @@ describe("formatPlan", () => {
   });
 });
 
+describe("formatPlan parallel note", () => {
+  it("shows which roles run in parallel", () => {
+    const out = formatPlan({
+      ...base,
+      message: "3 model calls planned",
+      plan: [
+        { role: "developer", agent: "claude" },
+        { role: "reviewer", agent: "claude", group: 1 },
+        { role: "security", agent: "claude", group: 1 },
+      ],
+    });
+    expect(out).toContain("reviewer");
+    expect(out).toMatch(/reviewer .*\(parallel with security\)/);
+    expect(out).toMatch(/security .*\(parallel with reviewer\)/);
+    expect(out.split("\n").find((l) => l.includes("developer"))).not.toContain("parallel");
+  });
+});
+
 describe("formatRoles", () => {
   it("shows every role's outcome with its reason", () => {
     const out = formatRoles({

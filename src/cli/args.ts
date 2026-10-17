@@ -13,6 +13,7 @@ export type Command =
       requireCodex?: boolean;
       keepGoing?: boolean;
       auto?: boolean;
+      sequential?: boolean;
     }
   | { name: "explain"; prompt: string }
   | { name: "status" }
@@ -32,6 +33,7 @@ export function parseArgs(argv: string[]): Command {
     let dryRun = false;
     let requireCodex = false;
     let keepGoing = false;
+    let sequential = false;
     let auto: boolean | undefined;
     const words: string[] = [];
     for (let i = 0; i < rest.length; i++) {
@@ -73,6 +75,7 @@ export function parseArgs(argv: string[]): Command {
       if (rest[i] === "--dry-run") { dryRun = true; continue; }
       if (rest[i] === "--require-codex") { requireCodex = true; continue; }
       if (rest[i] === "--keep-going") { keepGoing = true; continue; }
+      if (rest[i] === "--sequential") { sequential = true; continue; }
       words.push(rest[i]);
     }
     const prompt = words.join(" ").trim();
@@ -84,6 +87,7 @@ export function parseArgs(argv: string[]): Command {
       name: "run", prompt, cwd, context, role, roles, team,
       ...(dryRun ? { dryRun } : {}), ...(requireCodex ? { requireCodex } : {}), ...(keepGoing ? { keepGoing } : {}),
       ...(auto !== undefined ? { auto } : {}),
+      ...(sequential ? { sequential } : {}),
     };
   }
   if (cmd === "explain") {

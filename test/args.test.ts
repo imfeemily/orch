@@ -49,6 +49,11 @@ describe("parseArgs", () => {
     expect(parseArgs(["usage", "--by", "role"])).toEqual({ name: "usage", since: "24h", by: "role" });
   });
 
+  it("parses --sequential", () => {
+    expect(parseArgs(["run", "--team", "standard", "--sequential", "x"])).toMatchObject({ team: "standard", sequential: true });
+    expect(parseArgs(["run", "x"])).not.toHaveProperty("sequential");
+  });
+
   it("parses --auto, --no-auto and explain", () => {
     expect(parseArgs(["run", "--auto", "fix", "it"])).toMatchObject({ name: "run", prompt: "fix it", auto: true });
     expect(parseArgs(["run", "--no-auto", "fix", "it"])).toMatchObject({ auto: false });

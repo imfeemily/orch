@@ -14,6 +14,7 @@ export type Request =
       requireCodex?: boolean;
       keepGoing?: boolean;
       auto?: boolean;
+      sequential?: boolean;
     }
   | { type: "status" }
   | { type: "shutdown" };

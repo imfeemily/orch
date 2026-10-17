@@ -58,7 +58,7 @@ export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promi
       }
       const hasSelector = req.role !== undefined || req.roles !== undefined || req.team !== undefined;
       const autoOn = req.auto === true || (req.auto !== false && deps.config.auto.enabled && !hasSelector);
-      const wantsRoles = hasSelector || req.dryRun === true || req.requireCodex === true || req.keepGoing === true;
+      const wantsRoles = hasSelector || req.dryRun === true || req.requireCodex === true || req.keepGoing === true || req.sequential === true;
       try {
         if (autoOn || wantsRoles) {
           const readiness =
@@ -78,6 +78,7 @@ export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promi
               requireCodex: req.requireCodex === true,
               keepGoing: req.keepGoing === true,
               auto: req.auto === true,
+              sequential: req.sequential === true,
               signal,
               onChunk: (text) => send({ type: "chunk", text }),
             },
