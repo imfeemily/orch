@@ -4,6 +4,9 @@ All notable changes are listed here. Add user-visible changes under **Unreleased
 
 ## Unreleased
 
+## 0.2.1 (2026-10-17)
+
+- Package metadata: `repository`, `homepage` and `bugs` now point to https://github.com/imfeemily/orch so the npm page links to the source and the docs site.
 - Documentation site (VitePress) with English and Thai guides, a developer guide, and reference pages generated from the code; deployed to GitHub Pages from `main`.
 - CI checks that keep docs in step with code (docs coverage tests, pull request gate, PR template).
 

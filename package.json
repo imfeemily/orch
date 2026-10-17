@@ -1,6 +1,6 @@
 {
   "name": "claude-codex-orch",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Local orchestrator that routes coding tasks between Claude Code and Codex and fails over on rate limit or failure",
   "keywords": [
     "claude-code",
@@ -11,6 +11,14 @@
     "agent"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imfeemily/orch.git"
+  },
+  "homepage": "https://imfeemily.github.io/orch/",
+  "bugs": {
+    "url": "https://github.com/imfeemily/orch/issues"
+  },
   "type": "module",
   "bin": {
     "orch": "dist/cli/index.js",
