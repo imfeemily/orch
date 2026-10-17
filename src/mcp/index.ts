@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { orchHome } from "../core/config.js";
+import { billableTokens } from "../core/usage.js";
 import { connectOrStart, sendRequest } from "../daemon/client.js";
 
 const sock = join(orchHome(), "sock");
@@ -29,7 +30,7 @@ server.tool(
     if (final.type === "error") return text(final.message, true);
     if (final.type !== "result") return text("unexpected reply from daemon", true);
     const r = final.result;
-    const footer = `\n\n[orch] status=${r.status} agent=${r.agent ?? "-"} failedOver=${r.failedOver}${
+    const footer = `\n\n[orch] status=${r.status} agent=${r.agent ?? "-"} failedOver=${r.failedOver}${r.usage ? ` tokens=${billableTokens(r.usage)}` : ""}${
       r.message ? ` message=${r.message}` : ""
     }`;
     return text(r.output + footer, r.status !== "ok");

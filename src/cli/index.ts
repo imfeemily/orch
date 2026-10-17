@@ -3,7 +3,9 @@ import { join, resolve } from "node:path";
 import { initConfig, orchHome } from "../core/config.js";
 import { connectOrStart, isAlive, sendRequest } from "../daemon/client.js";
 import { parseArgs } from "./args.js";
+import { Ledger, billableTokens, parseDuration, summarize } from "../core/usage.js";
 import { finalOutputToPrint } from "./render.js";
+import { formatUsage } from "./usage-report.js";
 import { USAGE } from "./usage.js";
 
 async function main(): Promise<number> {
@@ -14,6 +16,13 @@ async function main(): Promise<number> {
     case "help":
       console.log(USAGE);
       return 0;
+
+    case "usage": {
+      const ledger = new Ledger(join(orchHome(), "usage.jsonl"));
+      const entries = ledger.readSince(Date.now() - parseDuration(cmd.since)!);
+      console.log(formatUsage(summarize(entries, cmd.by), cmd.since));
+      return 0;
+    }
 
     case "init": {
       const path = join(orchHome(), "config.yaml");
@@ -45,6 +54,9 @@ async function main(): Promise<number> {
         const left = Math.ceil((until - Date.now()) / 60000);
         console.log(`${agent}: ${left > 0 ? `cooling down, ${left}m left` : "available"}`);
       }
+      const rows = summarize(new Ledger(join(orchHome(), "usage.jsonl")).readSince(Date.now() - 86_400_000), "agent");
+      const tokens = (a: string) => (rows.find((r) => r.key === a)?.billableTokens ?? 0).toLocaleString("en-US");
+      console.log(`tokens (24h): claude ${tokens("claude")}, codex ${tokens("codex")}`);
       for (const j of m.jobs.slice(-10)) {
         const when = new Date(j.at).toISOString();
         console.log(

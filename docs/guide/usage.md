@@ -9,6 +9,7 @@ orch status                                     # cooldowns and recent jobs
 orch init                                       # create ~/.orch/config.yaml if missing
 orch daemon start                               # optional: it starts on demand
 orch daemon stop                                # required after editing config.yaml
+orch usage --since 7d --by model                # token usage from the ledger
 ```
 
 - `orch run` streams the agent's output and exits non-zero if both agents fail. When it fails over you will see `orch: switched agent, finished with <agent>` on stderr.

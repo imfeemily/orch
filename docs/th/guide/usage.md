@@ -9,6 +9,7 @@ orch status                                     # cooldown และงานล
 orch init                                       # สร้าง ~/.orch/config.yaml ถ้ายังไม่มี
 orch daemon start                               # ไม่จำเป็น เพราะเปิดเองเมื่อต้องใช้
 orch daemon stop                                # ต้องสั่งหลังแก้ config.yaml
+orch usage --since 7d --by model                # ยอดโทเค่นจาก ledger
 ```
 
 - `orch run` แสดงผลของเอเจนต์ทันทีที่ได้ และจบด้วย exit code ไม่เป็นศูนย์ถ้าทั้งสองตัวล้ม เมื่อสลับเอเจนต์จะเห็น

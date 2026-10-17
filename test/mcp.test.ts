@@ -22,7 +22,11 @@ describe("mcp server", () => {
       deps: {
         config: DEFAULT_CONFIG,
         state: new StateStore(join(home, "state.json")),
-        run: async () => ({ exitCode: 0, stdout: "mcp-ok", stderr: "" }),
+        run: async () => ({
+          exitCode: 0,
+          stdout: JSON.stringify({ result: "mcp-ok", usage: { input_tokens: 5, output_tokens: 7 } }),
+          stderr: "",
+        }),
       },
     });
     closers.push(daemon.close);
@@ -47,5 +51,7 @@ describe("mcp server", () => {
     expect(res.isError).toBeFalsy();
     expect(res.content[0].text).toContain("mcp-ok");
     expect(res.content[0].text).toContain("status=ok");
+    expect(res.content[0].text).toContain("tokens=12");
+    expect(res.content[0].text).not.toContain("input_tokens");
   }, 20_000);
 });

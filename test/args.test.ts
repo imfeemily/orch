@@ -31,6 +31,17 @@ describe("parseArgs", () => {
     expect(parseArgs(["daemon", "stop"])).toEqual({ name: "daemon", action: "stop" });
   });
 
+  it("parses usage with defaults and options", () => {
+    expect(parseArgs(["usage"])).toEqual({ name: "usage", since: "24h", by: "agent" });
+    expect(parseArgs(["usage", "--since", "7d", "--by", "model"])).toEqual({ name: "usage", since: "7d", by: "model" });
+  });
+
+  it("rejects a bad --by or --since for usage", () => {
+    expect(() => parseArgs(["usage", "--by", "tier"])).toThrow(/agent.*model/);
+    expect(() => parseArgs(["usage", "--since", "abc"])).toThrow(/--since/);
+    expect(() => parseArgs(["usage", "--nope"])).toThrow(/unknown option/);
+  });
+
   it("parses init", () => {
     expect(parseArgs(["init"])).toEqual({ name: "init" });
   });
