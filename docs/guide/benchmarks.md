@@ -107,7 +107,7 @@ The same three tasks with the default model, through orch, with the default cont
 | Fix a typo | 66,883 tokens, $0.4418 | 41,700 tokens, $0.2803 | **-37%** | -28% | yes / yes |
 | Write a small test | 43,107 tokens, $0.3154 | 17,552 tokens, $0.1369 | **-57%** | -46% | yes / yes |
 | Explain a function | 40,667 tokens, $0.2621 | 16,246 tokens, $0.1140 | **-56%** | -28% | yes / yes |
-| **All three** | **150,657 tokens, $1.0193** | **75,498 tokens, $0.5312** | **-48%** | **-34%** | 3/3 / 3/3 |
+| **All three** | **150,657 tokens, $1.0193** | **75,498 tokens, $0.5312** | **-48%** | **-35%** | 3/3 / 3/3 |
 
 "Total input" counts cache reads too (it is what the model actually received).
 
