@@ -37,6 +37,7 @@ export const DEFAULT_CONFIG: Config = {
       summaryArgs: ["-c", "-p", "--", "{prompt}"],
       modelArgs: ["--model", "{model}"],
       effortArgs: ["--effort", "{effort}"],
+      writeArgs: ["--permission-mode", "acceptEdits"],
       limitPatterns: LIMIT_PATTERNS,
       authPatterns: AUTH_PATTERNS,
       defaultCooldownSec: 3600,
@@ -48,6 +49,7 @@ export const DEFAULT_CONFIG: Config = {
       summaryArgs: ["exec", "resume", "--last", "--", "{prompt}"],
       modelArgs: ["-m", "{model}"],
       effortArgs: ["-c", 'model_reasoning_effort="{effort}"'],
+      writeArgs: ["-s", "workspace-write"],
       limitPatterns: LIMIT_PATTERNS,
       authPatterns: AUTH_PATTERNS,
       defaultCooldownSec: 3600,
@@ -55,14 +57,14 @@ export const DEFAULT_CONFIG: Config = {
   },
   tiers: {
     claude: {
-      small: { model: "haiku", effort: "low", context: "lean" },
-      medium: { model: "sonnet", effort: "medium" },
-      large: { model: "opus", effort: "high" },
+      small: { model: "haiku", effort: "low", context: "lean", write: true },
+      medium: { model: "sonnet", effort: "medium", write: true },
+      large: { model: "opus", effort: "high", write: true },
     },
     codex: {
-      small: { effort: "low", context: "lean" },
-      medium: { effort: "medium" },
-      large: { effort: "high" },
+      small: { effort: "low", context: "lean", write: true },
+      medium: { effort: "medium", write: true },
+      large: { effort: "high", write: true },
     },
   },
   contexts: {
@@ -334,6 +336,8 @@ function validate(cfg: Config): void {
     for (const tier of TIER_NAMES as TierName[]) {
       const c = cfg.tiers[agentName][tier];
       const at = `tiers.${agentName}.${tier}`;
+      if (c.write !== undefined && typeof c.write !== "boolean") throw new Error(`${at}.write must be true or false`);
+      if (c.write && !cfg.agents[agentName].writeArgs?.length) throw new Error(`${at} sets write but ${agentName} has no writeArgs`);
       if (c.context !== undefined && !Object.hasOwn(cfg.contexts, c.context)) throw new Error(`${at} uses unknown context "${c.context}"`);
       if (c.model && !cfg.agents[agentName].modelArgs?.length) throw new Error(`${at} sets a model but ${agentName} has no modelArgs`);
       if (c.effort && !cfg.agents[agentName].effortArgs?.length) throw new Error(`${at} sets an effort but ${agentName} has no effortArgs`);
@@ -342,6 +346,10 @@ function validate(cfg: Config): void {
   for (const name of AGENT_NAMES) {
     if (!OUTPUT_KINDS.includes(cfg.agents[name].output)) {
       throw new Error(`agents.${name}.output must be one of ${OUTPUT_KINDS.join(", ")}`);
+    }
+    const wa = cfg.agents[name].writeArgs;
+    if (wa !== undefined && !(Array.isArray(wa) && wa.every((a) => typeof a === "string"))) {
+      throw new Error(`agents.${name}.writeArgs must be a list of strings`);
     }
     const t = cfg.agents[name].timeoutSec;
     if (t !== undefined && !(typeof t === "number" && t > 0 && t * 1000 <= 2_147_483_647)) {

@@ -179,7 +179,7 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     const cfg = config.agents[agent];
     const startedAt = now();
     const contextArgs = contextName ? config.contexts[contextName]?.[agent] : undefined;
-    const roleArgs = roleCfg?.agentArgs?.[agent];
+    const roleArgs = roleCfg?.agentArgs?.[agent] ?? (req.only && choice.write ? cfg.writeArgs : undefined);
     const result = await run(cfg.command, buildAgentArgs(cfg, { ...choice, contextArgs, roleArgs }), prompt, {
       cwd: req.cwd,
       depth: req.depth,

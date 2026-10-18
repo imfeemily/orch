@@ -36,6 +36,7 @@ rules:
 - `effortArgs`: inserted before `--` when a rule sets an `effort`; every `{effort}` is replaced.
 - `limitPatterns`: case-insensitive regexes. A non-zero exit whose stderr, or last 20 lines of stdout, matches one of them is a rate limit and puts the agent on cooldown.
 - `authPatterns`: same matching; a hit means the agent is not logged in. Checked after `limitPatterns`.
+- `writeArgs`: flags that let the agent edit files, added in `--only` mode when the tier has `write: true` (see [Tiers](#tiers-single-agent-mode)).
 - `defaultCooldownSec`: cooldown after a rate limit when the message gives no reset time (default 3600).
 - `timeoutSec`: optional positive number. A run that takes longer is stopped and counts as a failure (so it can fail over). Off unless set; at most 2147483.
 
@@ -115,7 +116,7 @@ tiers:
     large:  { effort: high }
 ```
 
-Codex has no built-in model names because they change; add `model:` to a tier with a name from `/model` (for example `model: gpt-6-luna` on `small`). A `model` or `effort` needs the agent's `modelArgs` or `effortArgs`, and a `context` must exist; otherwise the config is rejected. A rule in `rules` for the same agent that matches the prompt overrides the tier's `model`, `effort` and `context`; a rule for the other agent is ignored. Plain `orch run` (without `--only`) is unchanged.
+Codex has no built-in model names because they change; add `model:` to a tier with a name from `/model` (for example `model: gpt-6-luna` on `small`). A `model` or `effort` needs the agent's `modelArgs` or `effortArgs`, and a `context` must exist; otherwise the config is rejected. A rule in `rules` for the same agent that matches the prompt overrides the tier's `model`, `effort` and `context`; a rule for the other agent is ignored. Every tier has `write: true` by default, so a task in `--only` mode can edit files: orch adds the agent's `writeArgs` (Claude `--permission-mode acceptEdits`, Codex `-s workspace-write`). Set `write: false` on a tier for a read-only run, or change `agents.<name>.writeArgs` to give the agent different permissions. Plain `orch run` (without `--only`) is unchanged and does not add these flags.
 
 ## Roles and teams
 

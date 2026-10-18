@@ -37,6 +37,7 @@ rules:
 - `effortArgs`: ถูกแทรกก่อน `--` เมื่อ rule กำหนด `effort` ทุก `{effort}` ถูกแทนด้วยระดับ
 - `limitPatterns`: regex แบบไม่สนตัวพิมพ์ ถ้า exit code ไม่เป็นศูนย์และ stderr หรือ 20 บรรทัดท้ายของ stdout ตรงกับอันใดอันหนึ่ง ถือเป็น rate limit และเอเจนต์ถูกพัก
 - `authPatterns`: จับคู่แบบเดียวกัน ตรงแปลว่าเอเจนต์ยังไม่ได้ login ตรวจหลัง `limitPatterns`
+- `writeArgs`: flags ที่ให้เอเจนต์แก้ไฟล์ได้ เพิ่มในโหมด `--only` เมื่อ tier มี `write: true` (ดู [Tiers](#tiers-โหมดเอเจนต์เดียว))
 - `defaultCooldownSec`: เวลาพักหลังติด rate limit เมื่อข้อความไม่บอกเวลา reset (ค่าเริ่มต้น 3600)
 - `timeoutSec`: ตัวเลขบวก (ไม่บังคับ) การรันที่นานกว่านี้จะถูกหยุดและนับเป็นความล้มเหลว (จึง failover ได้) ปิดอยู่ถ้าไม่ตั้ง ค่าสูงสุด 2147483
 
@@ -117,7 +118,7 @@ tiers:
     large:  { effort: high }
 ```
 
-Codex ไม่มีชื่อ model ในตัวเพราะเปลี่ยนบ่อย ให้เพิ่ม `model:` ใน tier ด้วยชื่อจาก `/model` (เช่น `model: gpt-6-luna` ที่ `small`) `model` หรือ `effort` ต้องมี `modelArgs` หรือ `effortArgs` ของเอเจนต์ และ `context` ต้องมีอยู่จริง ไม่เช่นนั้น config ถูกปฏิเสธ rule ใน `rules` ของเอเจนต์เดียวกันที่ตรงกับ prompt จะทับ `model`, `effort`, `context` ของ tier ส่วน rule ของเอเจนต์อีกตัวถูกละเว้น `orch run` ธรรมดา (ไม่มี `--only`) ไม่เปลี่ยน
+Codex ไม่มีชื่อ model ในตัวเพราะเปลี่ยนบ่อย ให้เพิ่ม `model:` ใน tier ด้วยชื่อจาก `/model` (เช่น `model: gpt-6-luna` ที่ `small`) `model` หรือ `effort` ต้องมี `modelArgs` หรือ `effortArgs` ของเอเจนต์ และ `context` ต้องมีอยู่จริง ไม่เช่นนั้น config ถูกปฏิเสธ rule ใน `rules` ของเอเจนต์เดียวกันที่ตรงกับ prompt จะทับ `model`, `effort`, `context` ของ tier ส่วน rule ของเอเจนต์อีกตัวถูกละเว้น ทุก tier มี `write: true` เป็นค่าเริ่มต้น งานในโหมด `--only` จึงแก้ไฟล์ได้: orch เพิ่ม `writeArgs` ของเอเจนต์ (Claude `--permission-mode acceptEdits`, Codex `-s workspace-write`) ตั้ง `write: false` ที่ tier เพื่อให้อ่านอย่างเดียว หรือแก้ `agents.<name>.writeArgs` เพื่อเปลี่ยนสิทธิ์ `orch run` ธรรมดา (ไม่มี `--only`) ไม่เปลี่ยนและไม่เพิ่ม flag เหล่านี้
 
 ## Roles และทีม
 

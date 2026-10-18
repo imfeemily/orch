@@ -33,6 +33,8 @@ export interface AgentConfig {
   modelArgs?: string[];
   /** argv template inserted when a rule picks an effort level; every "{effort}" is replaced */
   effortArgs?: string[];
+  /** flags that let the agent edit files; added when a tier says `write: true` (--only mode) */
+  writeArgs?: string[];
   /** case-insensitive regexes matched against stderr+stdout of a non-zero exit */
   limitPatterns: string[];
   /** case-insensitive regexes that mean "not logged in" (checked after limitPatterns) */
@@ -49,6 +51,8 @@ export interface TierChoice {
   model?: string;
   effort?: string;
   context?: string;
+  /** let the agent edit files in this tier (default true); needs the agent's writeArgs */
+  write?: boolean;
 }
 
 export type Tiers = Record<AgentName, Record<TierName, TierChoice>>;

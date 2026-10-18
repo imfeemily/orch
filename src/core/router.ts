@@ -9,6 +9,8 @@ export interface Route {
   model?: string;
   effort?: string;
   context?: string;
+  /** --only mode: add the agent's writeArgs so it can edit files */
+  write?: boolean;
 }
 
 function matchRule(config: Config, prompt: string): RouteRule | undefined {

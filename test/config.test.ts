@@ -199,6 +199,11 @@ describe("loadConfig", () => {
     expect(() => loadConfig(tmpFile("tiers:\n  gemini: {}\n"))).toThrow(/tiers\.gemini/);
     expect(() => loadConfig(tmpFile("tiers:\n  claude:\n    small:\n      context: nope\n"))).toThrow(/unknown context/);
     expect(() => loadConfig(tmpFile("tiers:\n  claude:\n    small: 3\n"))).toThrow(/tiers\.claude\.small/);
+    expect(() => loadConfig(tmpFile("tiers:\n  claude:\n    small:\n      write: yes please\n"))).toThrow(/tiers\.claude\.small\.write/);
+    expect(d.agents.claude.writeArgs).toEqual(["--permission-mode", "acceptEdits"]);
+    expect(d.tiers.codex.large.write).toBe(true);
+    expect(() => loadConfig(tmpFile("agents:\n  claude:\n    writeArgs: nope\n"))).toThrow(/writeArgs/);
+    expect(() => loadConfig(tmpFile("agents:\n  claude:\n    writeArgs: []\ntiers:\n  claude:\n    small:\n      write: true\n"))).toThrow(/writeArgs/);
   });
 
   it("accepts a positive agent timeoutSec and rejects anything else", () => {

@@ -43,5 +43,6 @@ export function pickOnlyRoute(config: Config, agent: AgentName, prompt: string):
   if (rule?.model) route.model = rule.model;
   if (rule?.effort) route.effort = rule.effort;
   if (rule?.context) route.context = rule.context;
+  if (route.write === undefined) route.write = true;
   return { ...guess, route };
 }
