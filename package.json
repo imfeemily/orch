@@ -1,6 +1,6 @@
 {
   "name": "claude-codex-orch",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Local orchestrator that routes coding tasks between Claude Code and Codex and fails over on rate limit or failure",
   "keywords": [
     "claude-code",
