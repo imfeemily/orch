@@ -21,9 +21,9 @@ export function formatRoles(result: TaskResult): string {
 }
 
 /** What `--only <agent>` would run for a prompt: the tier, why, and the model settings. */
-export function formatTier(t: { tier: string; reason: string; route: { agent: string; model?: string; effort?: string; context?: string } }): string {
+export function formatTier(t: { tier: string; reason: string; route: { agent: string; model?: string; effort?: string; context?: string; write?: boolean } }): string {
   const r = t.route;
-  return `only ${r.agent}: tier ${t.tier} (${t.reason})\n  model ${r.model ?? "default"}, effort ${r.effort ?? "default"}, context ${r.context ?? "none"}`;
+  return `only ${r.agent}: tier ${t.tier} (${t.reason})\n  model ${r.model ?? "default"}, effort ${r.effort ?? "default"}, context ${r.context ?? "none"}, ${r.write ? "can edit files" : "read-only"}`;
 }
 
 /** What automatic selection chose, with the reasons. */

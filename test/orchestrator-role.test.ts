@@ -110,6 +110,18 @@ describe("runTask with only", () => {
     for (const a of ["--model", "haiku", "--effort", "low", "--setting-sources"]) expect(s.calls[0].args).toContain(a);
   });
 
+  it("lets the agent edit files with its own write flags, unless the tier says no", async () => {
+    const s = setup({ claude: OK, codex: OK });
+    await goOnly(s, "claude", "fix a typo");
+    expect(s.calls[0].args).toContain("acceptEdits");
+    expect(s.calls[0].args.indexOf("acceptEdits")).toBeLessThan(s.calls[0].args.indexOf("--"));
+    await goOnly(s, "codex", "fix a typo");
+    expect(s.calls[1].args).toContain("workspace-write");
+    const ro = setup({ claude: OK, codex: OK }, (c) => { c.tiers.claude.small.write = false; });
+    await goOnly(ro, "claude", "fix a typo");
+    expect(ro.calls[0].args).not.toContain("acceptEdits");
+  });
+
   it("does not go to the other agent even when a rule would pick it", async () => {
     const s = setup({ claude: OK, codex: OK });
     await goOnly(s, "claude", "fix a typo");

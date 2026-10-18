@@ -39,7 +39,7 @@ describe("classifyTier", () => {
 describe("pickOnlyRoute", () => {
   it("uses the agent's tier settings", () => {
     const r = pickOnlyRoute(cfg(), "claude", "fix a typo");
-    expect(r.route).toEqual({ agent: "claude", model: "haiku", effort: "low", context: "lean" });
+    expect(r.route).toEqual({ agent: "claude", model: "haiku", effort: "low", context: "lean", write: true });
     expect(r.tier).toBe("small");
     expect(pickOnlyRoute(cfg(), "claude", "refactor the auth module").route).toMatchObject({ agent: "claude", model: "opus", effort: "high" });
     expect(pickOnlyRoute(cfg(), "claude", "add a login page").route).toMatchObject({ agent: "claude", model: "sonnet" });
@@ -64,9 +64,16 @@ describe("pickOnlyRoute", () => {
     expect(pickOnlyRoute(c, "claude", "fix a typo").route).toMatchObject({ model: "opus", effort: "low" });
   });
 
+  it("lets the run edit files by default, and a tier can turn that off", () => {
+    expect(pickOnlyRoute(cfg(), "claude", "fix a typo").route.write).toBe(true);
+    const c = cfg();
+    c.tiers.claude.large = { ...c.tiers.claude.large, write: false };
+    expect(pickOnlyRoute(c, "claude", "refactor the auth module").route.write).toBe(false);
+  });
+
   it("uses the user's own tier settings", () => {
     const c = cfg();
     c.tiers.claude.large = { model: "sonnet", effort: "max" };
-    expect(pickOnlyRoute(c, "claude", "refactor it").route).toEqual({ agent: "claude", model: "sonnet", effort: "max" });
+    expect(pickOnlyRoute(c, "claude", "refactor it").route).toMatchObject({ agent: "claude", model: "sonnet", effort: "max" });
   });
 });

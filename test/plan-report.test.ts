@@ -105,9 +105,9 @@ describe("formatAssets", () => {
 
 describe("formatTier", () => {
   it("shows the tier, why, and what would run", () => {
-    expect(formatTier({ tier: "small", reason: 'matched "typo"', route: { agent: "claude", model: "haiku", effort: "low", context: "lean" } })).toBe(
-      'only claude: tier small (matched "typo")\n  model haiku, effort low, context lean',
+    expect(formatTier({ tier: "small", reason: 'matched "typo"', route: { agent: "claude", model: "haiku", effort: "low", context: "lean", write: true } })).toBe(
+      'only claude: tier small (matched "typo")\n  model haiku, effort low, context lean, can edit files',
     );
-    expect(formatTier({ tier: "medium", reason: "no small or large keyword", route: { agent: "codex" } })).toContain("model default, effort default, context none");
+    expect(formatTier({ tier: "medium", reason: "no small or large keyword", route: { agent: "codex" } })).toContain("model default, effort default, context none, read-only");
   });
 });
