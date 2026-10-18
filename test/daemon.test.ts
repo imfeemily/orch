@@ -55,6 +55,23 @@ describe("daemon", () => {
     closers.push((await startDaemon({ sockPath: s.sockPath, deps: s.deps })).close);
   });
 
+  it("runs a request with only on that agent alone, and rejects only with roles, auto or dry-run", async () => {
+    const seen: string[] = [];
+    const run: RunFn = async (c) => {
+      seen.push(c);
+      return { exitCode: 2, stdout: "", stderr: "boom" };
+    };
+    const s = setup(run);
+    closers.push((await startDaemon({ sockPath: s.sockPath, deps: s.deps })).close);
+    const final = await sendRequest(s.sockPath, { type: "run", prompt: "hello", cwd: s.dir, depth: 0, only: "claude" }, () => {});
+    expect(final.type === "result" && final.result.status).toBe("failed");
+    expect(seen).toEqual(["claude"]);
+    for (const extra of [{ team: "quick" }, { auto: true }, { dryRun: true }]) {
+      const m = await sendRequest(s.sockPath, { type: "run", prompt: "hello", cwd: s.dir, depth: 0, only: "claude", ...extra }, () => {});
+      expect(m.type).toBe("error");
+    }
+  });
+
   it("sends progress messages that are not the final reply", async () => {
     const s = setup(okRun);
     closers.push((await startDaemon({ sockPath: s.sockPath, deps: s.deps })).close);

@@ -119,7 +119,11 @@ export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promi
         return;
       }
       const hasSelector = req.role !== undefined || req.roles !== undefined || req.team !== undefined;
-      const autoOn = req.auto === true || (req.auto !== false && deps.config.auto.enabled && !hasSelector);
+      if (req.only !== undefined && (hasSelector || req.auto === true || req.dryRun === true || req.requireCodex === true || req.keepGoing === true || req.sequential === true)) {
+        send({ type: "error", message: "only cannot be combined with roles, auto, dry-run or the team flags" });
+        return;
+      }
+      const autoOn = req.only === undefined && (req.auto === true || (req.auto !== false && deps.config.auto.enabled && !hasSelector));
       const wantsRoles = hasSelector || req.dryRun === true || req.requireCodex === true || req.keepGoing === true || req.sequential === true;
       try {
         if (autoOn || wantsRoles) {
@@ -154,6 +158,7 @@ export async function startDaemon(opts: DaemonOptions): Promise<{ close(): Promi
           cwd: req.cwd,
           depth: Number(req.depth) || 0,
           context: typeof req.context === "string" ? req.context : undefined,
+          ...(req.only !== undefined ? { only: req.only } : {}),
           signal,
           onChunk: (text) => send({ type: "chunk", text }),
         });

@@ -42,6 +42,17 @@ export interface AgentConfig {
   timeoutSec?: number;
 }
 
+export type TierName = "small" | "medium" | "large";
+
+/** What an agent runs with for one tier of work (all optional; needs the agent's modelArgs/effortArgs). */
+export interface TierChoice {
+  model?: string;
+  effort?: string;
+  context?: string;
+}
+
+export type Tiers = Record<AgentName, Record<TierName, TierChoice>>;
+
 export interface RouteRule {
   /** case-insensitive regex tested against the prompt */
   match: string;
@@ -88,6 +99,7 @@ export interface Config {
   defaultAgent: AgentName;
   agents: Record<AgentName, AgentConfig>;
   rules: RouteRule[];
+  tiers: Tiers;
   contexts: ContextPresets;
   roles: Record<string, RoleConfig>;
   /** team name to role names */

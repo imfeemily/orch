@@ -31,13 +31,14 @@ server.tool(
     keepGoing: z.boolean().optional().describe("Keep running later roles after a role fails."),
     auto: z.boolean().optional().describe("Pick roles from the prompt with keyword rules; false turns auto off for this call."),
     sequential: z.boolean().optional().describe("Run one role at a time even when read-only roles could overlap."),
+    only: z.enum(["claude", "codex"]).optional().describe("Use only this agent, with a model and effort chosen by the task's size (small, medium or large) and no failover to the other agent. Cannot be combined with roles, team, auto or dryRun."),
   },
-  async ({ prompt, cwd, context, role, roles, team, dryRun, requireCodex, keepGoing, auto, sequential }) => {
+  async ({ prompt, cwd, context, role, roles, team, dryRun, requireCodex, keepGoing, auto, sequential, only }) => {
     await connectOrStart(sock);
     const depth = Number(process.env.ORCH_DEPTH ?? 0) || 0;
     const final = await sendRequest(
       sock,
-      { type: "run", prompt, cwd: resolve(cwd ?? process.cwd()), depth, context, role, roles, team, dryRun, requireCodex, keepGoing, auto, sequential },
+      { type: "run", prompt, cwd: resolve(cwd ?? process.cwd()), depth, context, role, roles, team, dryRun, requireCodex, keepGoing, auto, sequential, only },
       () => {},
     );
     if (final.type === "error") return text(final.message, true);

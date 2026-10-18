@@ -20,6 +20,12 @@ export function formatRoles(result: TaskResult): string {
   return ["roles:", ...lines].join("\n");
 }
 
+/** What `--only <agent>` would run for a prompt: the tier, why, and the model settings. */
+export function formatTier(t: { tier: string; reason: string; route: { agent: string; model?: string; effort?: string; context?: string } }): string {
+  const r = t.route;
+  return `only ${r.agent}: tier ${t.tier} (${t.reason})\n  model ${r.model ?? "default"}, effort ${r.effort ?? "default"}, context ${r.context ?? "none"}`;
+}
+
 /** What automatic selection chose, with the reasons. */
 export function formatSelection(sel: { roles: string[]; reasons: string[]; dropped: string[] }): string {
   const head = sel.roles.length > 0 ? `auto: roles ${sel.roles.join(", ")}` : "auto: no roles";

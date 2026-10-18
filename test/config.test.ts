@@ -189,6 +189,18 @@ describe("loadConfig", () => {
     expect(() => loadConfig(tmpFile("agents:\n  claude:\n    timeoutSec: 3000000\n"))).toThrow(/timeoutSec/);
   });
 
+  it("has built-in tiers per agent, merges user tiers per key, and rejects bad ones", () => {
+    const d = loadConfig(tmpFile("defaultAgent: claude\n"));
+    expect(d.tiers.claude.small).toMatchObject({ model: "haiku", effort: "low", context: "lean" });
+    const m = loadConfig(tmpFile("tiers:\n  claude:\n    large:\n      model: sonnet\n"));
+    expect(m.tiers.claude.large).toMatchObject({ model: "sonnet", effort: "high" });
+    expect(m.tiers.claude.small.model).toBe("haiku");
+    expect(() => loadConfig(tmpFile("tiers:\n  claude:\n    huge: {}\n"))).toThrow(/tiers\.claude\.huge/);
+    expect(() => loadConfig(tmpFile("tiers:\n  gemini: {}\n"))).toThrow(/tiers\.gemini/);
+    expect(() => loadConfig(tmpFile("tiers:\n  claude:\n    small:\n      context: nope\n"))).toThrow(/unknown context/);
+    expect(() => loadConfig(tmpFile("tiers:\n  claude:\n    small: 3\n"))).toThrow(/tiers\.claude\.small/);
+  });
+
   it("accepts a positive agent timeoutSec and rejects anything else", () => {
     expect(loadConfig(tmpFile("agents:\n  claude:\n    timeoutSec: 600\n")).agents.claude.timeoutSec).toBe(600);
     for (const v of ["0", "-5", "soon"]) {

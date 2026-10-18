@@ -97,3 +97,47 @@ describe("runTask with a role", () => {
     expect(s.ledger.readSince(0)[0].role).toBeUndefined();
   });
 });
+
+describe("runTask with only", () => {
+  const goOnly = (s: ReturnType<typeof setup>, only: "claude" | "codex", prompt: string) =>
+    runTask(s.deps, { prompt, cwd: s.cwd, depth: 0, only });
+
+  it("runs the pinned agent with the tier's model, effort and context", async () => {
+    const s = setup({ claude: OK, codex: OK });
+    const r = await goOnly(s, "claude", "fix a typo in the README");
+    expect(r.status).toBe("ok");
+    expect(s.calls).toHaveLength(1);
+    for (const a of ["--model", "haiku", "--effort", "low", "--setting-sources"]) expect(s.calls[0].args).toContain(a);
+  });
+
+  it("does not go to the other agent even when a rule would pick it", async () => {
+    const s = setup({ claude: OK, codex: OK });
+    await goOnly(s, "claude", "fix a typo");
+    expect(s.calls.map((c) => c.command)).toEqual(["claude"]);
+  });
+
+  it("never fails over: a failure stays a failure and says so", async () => {
+    const s = setup({ claude: FAIL, codex: OK });
+    const r = await goOnly(s, "claude", "add a login page");
+    expect(r.status).toBe("failed");
+    expect(r.failedOver).toBe(false);
+    expect(r.message).toContain("--only claude");
+    expect(s.calls).toHaveLength(1);
+  });
+
+  it("is unavailable, not rerouted, while the pinned agent is cooling down", async () => {
+    const s = setup({ claude: OK, codex: OK });
+    s.state.setCooldown("claude", Date.now() + 3_600_000);
+    const s2 = { ...s, deps: { ...s.deps, now: () => Date.now() } };
+    const r = await goOnly(s2, "claude", "add a login page");
+    expect(r.status).toBe("unavailable");
+    expect(r.message).toContain("claude");
+    expect(s.calls).toHaveLength(0);
+  });
+
+  it("rejects --only together with a role", async () => {
+    const s = setup({ claude: OK, codex: OK });
+    const r = await runTask(s.deps, { prompt: "x", cwd: s.cwd, depth: 0, only: "claude", role: "reviewer" });
+    expect(r.status).toBe("rejected");
+  });
+});

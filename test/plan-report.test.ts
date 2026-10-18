@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAssets, formatPlan, formatRoles, formatSelection } from "../src/core/plan-report.js";
+import { formatTier, formatAssets, formatPlan, formatRoles, formatSelection } from "../src/core/plan-report.js";
 import type { TaskResult } from "../src/core/types.js";
 
 const base: TaskResult = { status: "planned", agent: null, output: "", failedOver: false, attempts: [] };
@@ -100,5 +100,14 @@ describe("formatAssets", () => {
   it("handles a single role result and is empty when there are no assets", () => {
     expect(formatAssets({ ...base, assets: ["/p/a.png"] })).toContain("/p/a.png");
     expect(formatAssets(base)).toBe("");
+  });
+});
+
+describe("formatTier", () => {
+  it("shows the tier, why, and what would run", () => {
+    expect(formatTier({ tier: "small", reason: 'matched "typo"', route: { agent: "claude", model: "haiku", effort: "low", context: "lean" } })).toBe(
+      'only claude: tier small (matched "typo")\n  model haiku, effort low, context lean',
+    );
+    expect(formatTier({ tier: "medium", reason: "no small or large keyword", route: { agent: "codex" } })).toContain("model default, effort default, context none");
   });
 });

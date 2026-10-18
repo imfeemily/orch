@@ -1,4 +1,10 @@
+import type { AgentName } from "../core/types.js";
 import { parseDuration } from "../core/usage.js";
+
+function agentOf(v: string | undefined): AgentName {
+  if (v !== "claude" && v !== "codex") throw new Error("--only requires claude or codex");
+  return v;
+}
 
 export type Command =
   | {
@@ -14,8 +20,9 @@ export type Command =
       keepGoing?: boolean;
       auto?: boolean;
       sequential?: boolean;
+      only?: AgentName;
     }
-  | { name: "explain"; prompt: string }
+  | { name: "explain"; prompt: string; only?: AgentName }
   | { name: "status" }
   | { name: "init" }
   | { name: "usage"; since: string; by: "agent" | "model" | "context" | "role" }
@@ -35,6 +42,7 @@ export function parseArgs(argv: string[]): Command {
     let keepGoing = false;
     let sequential = false;
     let auto: boolean | undefined;
+    let only: AgentName | undefined;
     const words: string[] = [];
     for (let i = 0; i < rest.length; i++) {
       if (rest[i] === "--") {
@@ -76,6 +84,10 @@ export function parseArgs(argv: string[]): Command {
         auto = false;
         continue;
       }
+      if (rest[i] === "--only") {
+        only = agentOf(rest[++i]);
+        continue;
+      }
       if (rest[i] === "--dry-run") { dryRun = true; continue; }
       if (rest[i] === "--require-codex") { requireCodex = true; continue; }
       if (rest[i] === "--keep-going") { keepGoing = true; continue; }
@@ -87,17 +99,25 @@ export function parseArgs(argv: string[]): Command {
     const chosen = [role !== undefined && "--role", roles !== undefined && "--roles", team !== undefined && "--team"].filter(Boolean);
     if (chosen.length > 1) throw new Error(`choose only one of ${chosen.join(" and ")}`);
     if (auto === true && chosen.length > 0) throw new Error(`choose only one of --auto and ${chosen.join(" and ")}`);
+    if (only && (chosen.length > 0 || auto === true)) throw new Error(`--only cannot be combined with ${chosen.length > 0 ? chosen.join(" or ") : "--auto"}`);
     return {
       name: "run", prompt, cwd, context, role, roles, team,
       ...(dryRun ? { dryRun } : {}), ...(requireCodex ? { requireCodex } : {}), ...(keepGoing ? { keepGoing } : {}),
       ...(auto !== undefined ? { auto } : {}),
       ...(sequential ? { sequential } : {}),
+      ...(only ? { only } : {}),
     };
   }
   if (cmd === "explain") {
-    const prompt = rest.join(" ").trim();
-    if (!prompt) throw new Error("usage: orch explain <prompt>");
-    return { name: "explain", prompt };
+    let only: AgentName | undefined;
+    const words: string[] = [];
+    for (let i = 0; i < rest.length; i++) {
+      if (rest[i] === "--only") only = agentOf(rest[++i]);
+      else words.push(rest[i]);
+    }
+    const prompt = words.join(" ").trim();
+    if (!prompt) throw new Error("usage: orch explain [--only claude|codex] <prompt>");
+    return { name: "explain", prompt, ...(only ? { only } : {}) };
   }
   if (cmd === "usage") {
     let since = "24h";

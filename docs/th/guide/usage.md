@@ -39,6 +39,7 @@ orch explain "แก้ typo ใน README"                             # --auto
 - `--dry-run` แสดง role เอเจนต์ของมัน และจำนวนการเรียก model โดยไม่รันอะไร
 - `--require-codex` หยุดก่อนเริ่มเมื่อมี role ที่ต้องใช้ Codex และ Codex ไม่พร้อม ถ้าไม่ใส่ role นั้นจะถูกข้าม
 - `--keep-going` รัน role ที่เหลือต่อหลังมี role ล้ม ค่าเริ่มต้นทีมจะหยุด
+- `--only claude` หรือ `--only codex` รันงานกับเอเจนต์ตัวเดียว (single mode) orch จัดงานเป็น tier **small**, **medium** หรือ **large** ด้วยคีย์เวิร์ด (ไม่เรียก model) แล้วใช้ model และ effort ของเอเจนต์นั้นตาม tier ไม่มี failover ถ้าล้มหรือติด cooldown จะรายงานตามจริง ใช้ร่วมกับ `--role`, `--roles`, `--team`, `--auto` หรือ `--dry-run` ไม่ได้ `orch explain --only claude "<prompt>"` แสดง tier และ model โดยไม่รัน ดู [Tiers](/th/guide/configuration#tiers-single-agent-mode)
 - `--` ปิดส่วน option: ทุกอย่างหลังจากนั้นคือ prompt แม้เป็นคำที่ขึ้นต้นด้วย `--` (`orch run -- "explain what --force does"`)
 - การรันแบบ team พิมพ์ความคืบหน้าหนึ่งบรรทัดต่อ role ที่ stderr (`orch: developer: started (claude)`, `orch: developer: ok`) คำตอบยังไปที่ stdout
 - `--sequential` รันทีละ role โดยค่าเริ่มต้น role อ่านอย่างเดียวที่อยู่ติดกัน (เช่น `reviewer` กับ `security`) รันขนานกัน ซึ่งประหยัดเวลาแต่ไม่ประหยัดโทเค่น

@@ -35,6 +35,7 @@ orch explain "fix the typo in README"                         # which roles --au
 
 - `--role`, `--roles` and `--team` cannot be combined. `--dry-run`, `--require-codex` and `--keep-going` only apply with one of them; without one orch rejects them instead of ignoring them.
 - `--auto` selects the roles from the prompt (no model call); `--no-auto` turns off `auto.enabled` for one run. `--auto` cannot be combined with `--role`, `--roles` or `--team`. `orch explain "<prompt>"` shows the selection without running.
+- `--only claude` or `--only codex` runs the task on that one agent only (single mode). orch sorts the task into a **small**, **medium** or **large** tier with plain keywords (no model call) and uses that agent's model and effort for the tier; there is no failover, so a failure or cooldown is reported as is. It cannot be combined with `--role`, `--roles`, `--team`, `--auto` or `--dry-run`. `orch explain --only claude "<prompt>"` shows the tier and the model without running. See [Tiers](/guide/configuration#tiers-single-agent-mode).
 - `--` ends the options: everything after it is the prompt, even words that start with `--` (`orch run -- "explain what --force does"`).
 - Team runs print one progress line per role on stderr (`orch: developer: started (claude)`, `orch: developer: ok`), so a long run is not silent. The answer still goes to stdout.
 - `--dry-run` prints the roles, their agents and the number of model calls without running anything.
