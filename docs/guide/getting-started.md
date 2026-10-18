@@ -32,6 +32,8 @@ claude mcp add orch -- orch-mcp
 codex mcp add orch -- orch-mcp
 ```
 
+Using VS Code (Copilot), Cursor or Claude Desktop instead? See [Editors and chat apps](/guide/editors).
+
 Then ask either tool to use the `orch_run` tool. See [Usage](/guide/usage) for details and the Codex timeout setting.
 
 ## Next

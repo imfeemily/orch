@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { parseArgs } from "../src/cli/args.js";
 
+describe("mcp-config", () => {
+  it("parses the client, --write and --cwd, and rejects an unknown client", () => {
+    expect(parseArgs(["mcp-config", "cursor"])).toEqual({ name: "mcp-config", client: "cursor", write: false });
+    expect(parseArgs(["mcp-config", "vscode", "--write", "--cwd", "/p"])).toEqual({ name: "mcp-config", client: "vscode", write: true, cwd: "/p" });
+    expect(() => parseArgs(["mcp-config", "emacs"])).toThrow(/vscode, cursor, claude-desktop/);
+    expect(() => parseArgs(["mcp-config"])).toThrow(/vscode, cursor, claude-desktop/);
+  });
+});
+
 describe("--only", () => {
   it("parses --only for run and explain, and rejects other values or combinations", () => {
     expect(parseArgs(["run", "--only", "codex", "fix typo"])).toMatchObject({ name: "run", only: "codex", prompt: "fix typo" });

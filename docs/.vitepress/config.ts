@@ -49,6 +49,7 @@ export default defineConfig({
               items: [
                 { text: "Getting started", link: "/guide/getting-started" },
                 { text: "Usage", link: "/guide/usage" },
+                { text: "Editors and chat apps", link: "/guide/editors" },
                 { text: "Roles", link: "/guide/roles" },
                 { text: "Configuration", link: "/guide/configuration" },
                 { text: "Troubleshooting", link: "/guide/troubleshooting" },
@@ -79,6 +80,7 @@ export default defineConfig({
               items: [
                 { text: "เริ่มต้นใช้งาน", link: "/th/guide/getting-started" },
                 { text: "วิธีใช้งาน", link: "/th/guide/usage" },
+                { text: "Editor และแอปแชท", link: "/th/guide/editors" },
                 { text: "Roles", link: "/th/guide/roles" },
                 { text: "การตั้งค่า", link: "/th/guide/configuration" },
                 { text: "แก้ปัญหา", link: "/th/guide/troubleshooting" },

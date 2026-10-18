@@ -45,6 +45,14 @@ orch explain "fix the typo in README"                         # which roles --au
 
 See [Roles](/guide/roles) for what each role does, handoffs and artifacts.
 
+## Editors and chat apps
+
+```bash
+orch mcp-config vscode --write   # also: cursor, claude-desktop; without --write it only prints
+```
+
+`orch mcp-config <vscode|cursor|claude-desktop>` prints the MCP entry and the file it belongs in; `--write` adds it without touching other servers. See [Editors and chat apps](/guide/editors).
+
 ## Usage and cost
 
 orch records every agent attempt in `~/.orch/usage.jsonl` (kept for 90 days) and reads token counts from the agent's JSON output.

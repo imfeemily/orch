@@ -4,6 +4,8 @@ All notable changes are listed here. Add user-visible changes under **Unreleased
 
 ## Unreleased
 
+- Editors and chat apps: `orch mcp-config vscode|cursor|claude-desktop [--write]` prints or adds the MCP entry for VS Code (Copilot agent mode), Cursor and Claude Desktop without touching other servers or overwriting files that are not plain JSON. The MCP server now offers the prompts `orch-fix`, `orch-review` and `orch-explain`. New Editors and chat apps guide (English and Thai).
+
 ## 0.3.0 (2026-10-18)
 
 - Single-agent mode: `orch run --only claude|codex` (also `only` on MCP `orch_run`) runs one agent and picks its model, effort and context from a small, medium or large tier chosen by keywords (no model call). New `tiers` config with built-in defaults (Claude: haiku, sonnet, opus; Codex: effort only). No failover. `orch explain --only claude "<prompt>"` shows the tier and settings. Tiers carry `write: true` by default (the agent's new `writeArgs`: Claude `--permission-mode acceptEdits`, Codex `-s workspace-write`) so `--only` runs can edit files; `write: false` makes a tier read-only. Plain `orch run` is unchanged.

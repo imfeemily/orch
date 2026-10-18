@@ -46,6 +46,14 @@ orch explain "แก้ typo ใน README"                             # --auto
 
 ดู [Roles](/th/guide/roles) สำหรับหน้าที่ของแต่ละ role, handoff และไฟล์ที่บันทึก
 
+## Editor และแอปแชท
+
+```bash
+orch mcp-config vscode --write   # หรือ cursor, claude-desktop; ถ้าไม่ใส่ --write จะแค่พิมพ์
+```
+
+`orch mcp-config <vscode|cursor|claude-desktop>` พิมพ์ entry ของ MCP และไฟล์ที่ต้องใส่ `--write` เพิ่มให้โดยไม่แตะ server อื่น ดู [Editor และแอปแชท](/th/guide/editors)
+
 ## การใช้งานและค่าใช้จ่าย
 
 orch บันทึกทุก attempt ของเอเจนต์ลง `~/.orch/usage.jsonl` (เก็บ 90 วัน) และอ่านจำนวนโทเค่นจาก JSON output ของเอเจนต์

@@ -47,6 +47,13 @@ describe("mcp server", () => {
 
     const tools = await client.listTools();
     expect(tools.tools.map((t) => t.name).sort()).toEqual(["orch_run", "orch_status"]);
+    const prompts = await client.listPrompts();
+    expect(prompts.prompts.map((p) => p.name).sort()).toEqual(["orch-explain", "orch-fix", "orch-review"]);
+    const review = await client.getPrompt({ name: "orch-review", arguments: { task: "the new parser" } });
+    const msg = (review.messages[0].content as { text: string }).text;
+    expect(msg).toContain("orch_run");
+    expect(msg).toContain('role: "reviewer"');
+    expect(msg).toContain("the new parser");
     const run = tools.tools.find((t) => t.name === "orch_run")!;
     expect(run.description).toContain("role");
     const props = (run.inputSchema as { properties: Record<string, { description?: string }> }).properties;
