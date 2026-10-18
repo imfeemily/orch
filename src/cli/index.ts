@@ -1,5 +1,8 @@
 #!/usr/bin/env node
-import { join, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { clientConfig, mergeClientConfig } from "../core/mcp-config.js";
 import { initConfig, orchHome } from "../core/config.js";
 import { connectOrStart, isAlive, sendRequest } from "../daemon/client.js";
 import { parseArgs } from "./args.js";
@@ -31,6 +34,26 @@ async function main(): Promise<number> {
     case "explain": {
       const cfg = loadConfig();
       console.log(cmd.only ? formatTier(pickOnlyRoute(cfg, cmd.only, cmd.prompt)) : formatSelection(selectRoles(cfg, cmd.prompt)));
+      return 0;
+    }
+
+    case "mcp-config": {
+      const cfg = clientConfig(cmd.client, { home: homedir(), cwd: resolve(cmd.cwd ?? process.cwd()), platform: process.platform, appData: process.env.APPDATA });
+      const existing = existsSync(cfg.path) ? readFileSync(cfg.path, "utf8") : undefined;
+      const merged = mergeClientConfig(existing, cfg);
+      if (!cmd.write) {
+        console.log(`# ${cfg.path}`);
+        console.log(merged.text.trimEnd());
+        console.log(`\n# add it yourself, or run: orch mcp-config ${cmd.client} --write`);
+        return 0;
+      }
+      if (merged.change === "unchanged") {
+        console.log(`${cfg.path} already has orch`);
+        return 0;
+      }
+      mkdirSync(dirname(cfg.path), { recursive: true });
+      writeFileSync(cfg.path, merged.text);
+      console.log(`${merged.change} orch in ${cfg.path}; restart ${cmd.client} to load it`);
       return 0;
     }
 

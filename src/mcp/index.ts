@@ -62,6 +62,17 @@ server.tool(
   },
 );
 
+const PROMPTS: [name: string, description: string, instruction: (task: string) => string][] = [
+  ["orch-fix", "Make a change with orch: the developer role edits the code", (t) => `Call the orch_run tool with prompt: ${JSON.stringify(t)} and role: "developer", then summarise the result for me.`],
+  ["orch-review", "Review code with orch: the reviewer role reads and reports", (t) => `Call the orch_run tool with prompt: ${JSON.stringify(`Review: ${t}`)} and role: "reviewer", then summarise the findings for me.`],
+  ["orch-explain", "Ask orch a question; it answers without changing files", (t) => `Call the orch_run tool with prompt: ${JSON.stringify(t)} and only: "claude", then give me its answer.`],
+];
+for (const [name, description, instruction] of PROMPTS) {
+  server.prompt(name, description, { task: z.string().describe("What to do, review or explain.") }, ({ task }) => ({
+    messages: [{ role: "user" as const, content: { type: "text" as const, text: instruction(task) } }],
+  }));
+}
+
 server.tool("orch_status", "Show agent cooldowns and recent jobs.", {}, async () => {
   await connectOrStart(sock);
   const m = await sendRequest(sock, { type: "status" }, () => {});

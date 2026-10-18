@@ -1,3 +1,4 @@
+import { MCP_CLIENTS, type McpClient } from "../core/mcp-config.js";
 import type { AgentName } from "../core/types.js";
 import { parseDuration } from "../core/usage.js";
 
@@ -23,6 +24,7 @@ export type Command =
       only?: AgentName;
     }
   | { name: "explain"; prompt: string; only?: AgentName }
+  | { name: "mcp-config"; client: McpClient; write: boolean; cwd?: string }
   | { name: "status" }
   | { name: "init" }
   | { name: "usage"; since: string; by: "agent" | "model" | "context" | "role" }
@@ -118,6 +120,20 @@ export function parseArgs(argv: string[]): Command {
     const prompt = words.join(" ").trim();
     if (!prompt) throw new Error("usage: orch explain [--only claude|codex] <prompt>");
     return { name: "explain", prompt, ...(only ? { only } : {}) };
+  }
+  if (cmd === "mcp-config") {
+    const client = rest[0];
+    if (!MCP_CLIENTS.includes(client as McpClient)) throw new Error(`usage: orch mcp-config <${MCP_CLIENTS.join("|").replace(/\|/g, ", ")}> [--write] [--cwd DIR]`);
+    let write = false;
+    let cwd: string | undefined;
+    for (let i = 1; i < rest.length; i++) {
+      if (rest[i] === "--write") write = true;
+      else if (rest[i] === "--cwd") {
+        cwd = rest[++i];
+        if (!cwd) throw new Error("--cwd requires a directory");
+      } else throw new Error(`unknown option: ${rest[i]}`);
+    }
+    return { name: "mcp-config", client: client as McpClient, write, ...(cwd ? { cwd } : {}) };
   }
   if (cmd === "usage") {
     let since = "24h";
