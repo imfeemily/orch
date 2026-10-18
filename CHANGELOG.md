@@ -4,6 +4,8 @@ All notable changes are listed here. Add user-visible changes under **Unreleased
 
 ## Unreleased
 
+- Visuals: a hero banner and architecture, failover and roles diagrams (designed by the `designer` role on Codex) on the docs home page, a new How it works page (English and Thai) and the README.
+
 - Editors and chat apps: `orch mcp-config vscode|cursor|claude-desktop [--write]` prints or adds the MCP entry for VS Code (Copilot agent mode), Cursor and Claude Desktop without touching other servers or overwriting files that are not plain JSON. The MCP server now offers the prompts `orch-fix`, `orch-review` and `orch-explain`. New Editors and chat apps guide (English and Thai).
 
 ## 0.3.0 (2026-10-18)

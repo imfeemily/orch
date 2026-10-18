@@ -3,6 +3,9 @@ layout: home
 hero:
   name: claude-codex-orch
   text: One task, two coding agents
+  image:
+    src: /img/hero.jpg
+    alt: orch routes work between two AI coding agents
   tagline: Route work between Claude Code and Codex, fail over when one hits a limit, and spend fewer tokens doing it.
   actions:
     - theme: brand
