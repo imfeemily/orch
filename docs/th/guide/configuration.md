@@ -22,6 +22,7 @@ rules:
 - `defaultAgent`: `claude` หรือ `codex` ใช้เมื่อไม่มี rule ตรง
 - `agents`: ค่าของแต่ละเอเจนต์ (`claude`, `codex`) ดูด้านล่าง
 - `contexts`: preset ที่รวม flag เพิ่มเติมเพื่อลด context คงที่ของแต่ละการเรียก ดู [Context presets](#context-presets)
+- `tiers`: model, effort และ context ต่อเอเจนต์สำหรับงาน `small`, `medium`, `large` ที่ `--only` ใช้ ดู [Tiers](#tiers-โหมดเอเจนต์เดียว)
 - `auto`: การเลือก role อัตโนมัติ ดู [การเลือกอัตโนมัติ](#การเลือกอัตโนมัติ-auto)
 - `roles`, `teams`, `pipeline`: การรันเฉพาะทาง และชุดของมันที่ตั้งชื่อไว้ ดู [Roles และทีม](#roles-และทีม)
 - `rules`: รายการเรียงลำดับ rule แรกที่ `match` ตรงกับ prompt จะถูกใช้
@@ -93,6 +94,30 @@ preset ในตัว (ดู flag ที่แน่นอนที่ [defaul
 - preset ของคุณถูกผสานกับของในตัวตามชื่อและตามเอเจนต์ จึงเพิ่ม `mine:` หรือแก้เฉพาะ `lean.codex` ได้
 - ชื่อ flag และ feature เป็นของแต่ละ CLI และเปลี่ยนตามเวอร์ชัน ถ้า CLI ปฏิเสธ flag งานจะล้มและ orch จะสลับเอเจนต์ ให้แก้ preset แล้ว `orch daemon stop`
 - `orch usage --by context` เทียบ preset จากการใช้งานจริงของคุณ
+
+## Tiers (โหมดเอเจนต์เดียว)
+
+`orch run --only claude "<prompt>"` รันเอเจนต์ตัวเดียวและเลือก model ตามขนาดของงาน tier มาจากคีย์เวิร์ดใน prompt ไม่เรียก model:
+
+- **large**: refactor, migrate, architecture, redesign, rewrite, race condition, deadlock, concurrency, performance, security audit, investigate, root cause, design (และคำไทย เช่น รีแฟกเตอร์ ออกแบบ สถาปัตยกรรม) หรือ prompt ที่ยาวเกิน 2,000 ตัวอักษร large ชนะ small
+- **small**: typo, rename, summarize, format, comment, docstring, changelog, bump (และคำไทย เช่น ตัวสะกด สรุป เปลี่ยนชื่อ)
+- **medium**: นอกนั้นทั้งหมด และงานที่แยกไม่ออก
+
+แต่ละเอเจนต์มีค่าของตัวเองต่อ tier ผสมกับค่าในตัวทีละ key:
+
+```yaml
+tiers:
+  claude:
+    small:  { model: haiku,  effort: low,    context: lean }
+    medium: { model: sonnet, effort: medium }
+    large:  { model: opus,   effort: high }
+  codex:
+    small:  { effort: low, context: lean }
+    medium: { effort: medium }
+    large:  { effort: high }
+```
+
+Codex ไม่มีชื่อ model ในตัวเพราะเปลี่ยนบ่อย ให้เพิ่ม `model:` ใน tier ด้วยชื่อจาก `/model` (เช่น `model: gpt-6-luna` ที่ `small`) `model` หรือ `effort` ต้องมี `modelArgs` หรือ `effortArgs` ของเอเจนต์ และ `context` ต้องมีอยู่จริง ไม่เช่นนั้น config ถูกปฏิเสธ rule ใน `rules` ของเอเจนต์เดียวกันที่ตรงกับ prompt จะทับ `model`, `effort`, `context` ของ tier ส่วน rule ของเอเจนต์อีกตัวถูกละเว้น `orch run` ธรรมดา (ไม่มี `--only`) ไม่เปลี่ยน
 
 ## Roles และทีม
 

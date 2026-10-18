@@ -6,8 +6,9 @@ import { parseArgs } from "./args.js";
 import { Ledger, billableTokens, parseDuration, summarize } from "../core/usage.js";
 import { finalOutputToPrint } from "./render.js";
 import { loadConfig } from "../core/config.js";
+import { pickOnlyRoute } from "../core/tiers.js";
 import { selectRoles } from "../core/select-roles.js";
-import { formatAssets, formatPlan, formatRoles, formatSelection } from "../core/plan-report.js";
+import { formatTier, formatAssets, formatPlan, formatRoles, formatSelection } from "../core/plan-report.js";
 import { formatUsage } from "./usage-report.js";
 import { USAGE } from "./usage.js";
 
@@ -28,7 +29,8 @@ async function main(): Promise<number> {
     }
 
     case "explain": {
-      console.log(formatSelection(selectRoles(loadConfig(), cmd.prompt)));
+      const cfg = loadConfig();
+      console.log(cmd.only ? formatTier(pickOnlyRoute(cfg, cmd.only, cmd.prompt)) : formatSelection(selectRoles(cfg, cmd.prompt)));
       return 0;
     }
 
@@ -93,6 +95,7 @@ async function main(): Promise<number> {
           keepGoing: cmd.keepGoing,
           auto: cmd.auto,
           sequential: cmd.sequential,
+          only: cmd.only,
         },
         (m) => {
           if (m.type === "chunk") process.stdout.write(m.text);

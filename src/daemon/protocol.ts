@@ -15,6 +15,7 @@ export type Request =
       keepGoing?: boolean;
       auto?: boolean;
       sequential?: boolean;
+      only?: AgentName;
     }
   | { type: "status" }
   | { type: "shutdown" };

@@ -21,6 +21,7 @@ rules:
 - `defaultAgent`: `claude` or `codex`. Used when no rule matches.
 - `agents`: settings per agent (`claude`, `codex`); see below.
 - `contexts`: named presets of extra flags that shrink the fixed context of each call; see [Context presets](#context-presets).
+- `tiers`: model, effort and context per agent for `small`, `medium` and `large` tasks, used by `--only`; see [Tiers](#tiers-single-agent-mode).
 - `auto`: automatic role selection; see [Automatic selection](#automatic-selection-auto).
 - `roles`, `teams`, `pipeline`: specialised runs and the named sets of them; see [Roles and teams](#roles-and-teams).
 - `rules`: ordered list; the first rule whose `match` fits the prompt wins.
@@ -91,6 +92,30 @@ Things to know before using one:
 - Your own presets are merged with the built-in ones by name and by agent, so you can add `mine:` or change just `lean.codex`.
 - Flag and feature names belong to each CLI and change between versions. If a CLI rejects a flag, the run fails and orch fails over; fix the preset and run `orch daemon stop`.
 - `orch usage --by context` compares presets from your own usage.
+
+## Tiers (single-agent mode)
+
+`orch run --only claude "<prompt>"` runs one agent and picks its model by the size of the task. The tier comes from keywords in the prompt, never from a model call:
+
+- **large**: refactor, migrate, architecture, redesign, rewrite, race condition, deadlock, concurrency, performance, security audit, investigate, root cause, design (and Thai equivalents), or a prompt over 2,000 characters. Large wins over small.
+- **small**: typo, rename, summarize, format, comment, docstring, changelog, bump (and Thai equivalents).
+- **medium**: everything else, and anything orch cannot tell.
+
+Each agent has its own settings per tier, merged with the built-in ones key by key:
+
+```yaml
+tiers:
+  claude:
+    small:  { model: haiku,  effort: low,    context: lean }
+    medium: { model: sonnet, effort: medium }
+    large:  { model: opus,   effort: high }
+  codex:
+    small:  { effort: low, context: lean }
+    medium: { effort: medium }
+    large:  { effort: high }
+```
+
+Codex has no built-in model names because they change; add `model:` to a tier with a name from `/model` (for example `model: gpt-6-luna` on `small`). A `model` or `effort` needs the agent's `modelArgs` or `effortArgs`, and a `context` must exist; otherwise the config is rejected. A rule in `rules` for the same agent that matches the prompt overrides the tier's `model`, `effort` and `context`; a rule for the other agent is ignored. Plain `orch run` (without `--only`) is unchanged.
 
 ## Roles and teams
 

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { parse, stringify } from "yaml";
-import type { AgentConfig, AgentName, Capability, Config, ContextPresets, OutputKind, RoleConfig } from "./types.js";
+import type { AgentConfig, AgentName, Capability, Config, ContextPresets, OutputKind, RoleConfig, TierName, Tiers } from "./types.js";
 
 export const AGENT_NAMES: AgentName[] = ["claude", "codex"];
 const CAPABILITIES: Capability[] = ["image"];
@@ -51,6 +51,18 @@ export const DEFAULT_CONFIG: Config = {
       limitPatterns: LIMIT_PATTERNS,
       authPatterns: AUTH_PATTERNS,
       defaultCooldownSec: 3600,
+    },
+  },
+  tiers: {
+    claude: {
+      small: { model: "haiku", effort: "low", context: "lean" },
+      medium: { model: "sonnet", effort: "medium" },
+      large: { model: "opus", effort: "high" },
+    },
+    codex: {
+      small: { effort: "low", context: "lean" },
+      medium: { effort: "medium" },
+      large: { effort: "high" },
     },
   },
   contexts: {
@@ -144,6 +156,26 @@ function mergeAgent(name: AgentName, user: Record<string, unknown> | undefined):
 }
 
 /** User presets add to or override the built-in ones, per preset name and per agent. */
+const TIER_NAMES = ["small", "medium", "large"];
+
+/** User tiers add to the built-in ones per agent, tier and key. */
+function mergeTiers(user: unknown): Tiers {
+  const merged: Tiers = structuredClone(DEFAULT_CONFIG.tiers);
+  if (user === undefined || user === null) return merged;
+  if (!plainObject(user)) throw new Error("tiers must be a mapping of agent names to tier settings");
+  for (const [agent, tiers] of Object.entries(user)) {
+    if (!AGENT_NAMES.includes(agent as AgentName)) throw new Error(`tiers.${agent} is not an agent (use ${AGENT_NAMES.join(", ")})`);
+    if (!plainObject(tiers)) throw new Error(`tiers.${agent} must be a mapping of small, medium, large`);
+    for (const [tier, choice] of Object.entries(tiers)) {
+      if (!TIER_NAMES.includes(tier)) throw new Error(`tiers.${agent}.${tier} is not a tier (use ${TIER_NAMES.join(", ")})`);
+      if (!plainObject(choice)) throw new Error(`tiers.${agent}.${tier} must be a mapping of model, effort, context`);
+      const slot = merged[agent as AgentName];
+      slot[tier as TierName] = { ...slot[tier as TierName], ...choice };
+    }
+  }
+  return merged;
+}
+
 function mergeContexts(user: unknown): ContextPresets {
   const merged: ContextPresets = structuredClone(DEFAULT_CONFIG.contexts);
   if (user && typeof user === "object") {
@@ -198,6 +230,7 @@ export function loadConfig(path?: string): Config {
       codex: mergeAgent("codex", raw.agents?.codex),
     },
     rules: raw.rules ?? structuredClone(DEFAULT_CONFIG.rules),
+    tiers: mergeTiers(raw.tiers),
     contexts: mergeContexts(raw.contexts),
     roles: mergeRoles(raw.roles),
     teams: { ...structuredClone(DEFAULT_CONFIG.teams), ...(raw.teams ?? {}) },
@@ -295,6 +328,15 @@ function validate(cfg: Config): void {
     }
     if (rule.effort && !agent.effortArgs?.length) {
       throw new Error(`rule "${rule.match}" sets an effort but ${rule.agent} has no effortArgs`);
+    }
+  }
+  for (const agentName of AGENT_NAMES) {
+    for (const tier of TIER_NAMES as TierName[]) {
+      const c = cfg.tiers[agentName][tier];
+      const at = `tiers.${agentName}.${tier}`;
+      if (c.context !== undefined && !Object.hasOwn(cfg.contexts, c.context)) throw new Error(`${at} uses unknown context "${c.context}"`);
+      if (c.model && !cfg.agents[agentName].modelArgs?.length) throw new Error(`${at} sets a model but ${agentName} has no modelArgs`);
+      if (c.effort && !cfg.agents[agentName].effortArgs?.length) throw new Error(`${at} sets an effort but ${agentName} has no effortArgs`);
     }
   }
   for (const name of AGENT_NAMES) {

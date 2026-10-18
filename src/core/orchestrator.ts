@@ -5,6 +5,7 @@ import { buildHandoff } from "./handoff.js";
 import { parseAgentOutput } from "./output.js";
 import { parseResetTime } from "./reset.js";
 import { type Route, otherAgent, pickRoleRoute, pickRoute } from "./router.js";
+import { pickOnlyRoute } from "./tiers.js";
 import type { StateStore } from "./state.js";
 import type { AgentName, Attempt, Config, RunFn, TaskResult } from "./types.js";
 import { type Ledger, sumUsage } from "./usage.js";
@@ -27,6 +28,8 @@ export interface TaskRequest {
   context?: string;
   /** name of a role: its agent, model, effort, context and agent args apply */
   role?: string;
+  /** run only this agent: tier-based model and effort, no failover to the other agent */
+  only?: AgentName;
   /** groups the runs of one team in the ledger (used as the task id) */
   runId?: string;
 }
@@ -134,9 +137,24 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
     };
   }
 
-  const route = roleCfg
-    ? pickRoleRoute(config, roleCfg, req.prompt, cooling)
-    : pickRoute(config, req.prompt, cooling);
+  if (req.only !== undefined && (!Object.hasOwn(config.agents, req.only) || roleCfg)) {
+    return {
+      status: "rejected",
+      agent: null,
+      output: "",
+      failedOver: false,
+      attempts: [],
+      message: roleCfg ? "--only cannot be combined with a role" : `unknown agent "${req.only}" for --only; use claude or codex`,
+    };
+  }
+
+  const route = req.only
+    ? cooling(req.only)
+      ? null
+      : pickOnlyRoute(config, req.only, req.prompt).route
+    : roleCfg
+      ? pickRoleRoute(config, roleCfg, req.prompt, cooling)
+      : pickRoute(config, req.prompt, cooling);
   if (!route) {
     const pinnedTo = roleCfg && roleCfg.needs.length > 0 ? (roleCfg.agent ?? "codex") : undefined;
     return record({
@@ -145,7 +163,9 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
       output: "",
       failedOver: false,
       attempts: [],
-      message: pinnedTo
+      message: req.only
+        ? `--only ${req.only}: ${req.only} is cooling down (${describeCooldowns()})`
+        : pinnedTo
         ? `role "${req.role}" needs ${pinnedTo}, which is cooling down (${describeCooldowns()})`
         : `Both agents are cooling down (${describeCooldowns()})`,
     });
@@ -244,6 +264,18 @@ export async function runTask(deps: Deps, req: TaskRequest): Promise<TaskResult>
         `${first} ${a1.outcome}; role "${req.role}" needs ${roleCfg.needs.join(", ")} and cannot fail over`,
         [a1.attempt],
       ),
+    });
+  }
+
+  if (req.only) {
+    return record({
+      status: "failed",
+      agent: first,
+      output: a1.text,
+      failedOver: false,
+      attempts: [a1.attempt],
+      streamed: a1.streamed,
+      message: withAuthHints(`${first} ${a1.outcome}; --only ${first} does not fail over: ${a1.detail.trim().slice(0, 300)}`, [a1.attempt]),
     });
   }
 

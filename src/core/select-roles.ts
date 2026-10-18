@@ -41,7 +41,7 @@ const PRIORITY = ["developer", "security", "tester", "reviewer", "architecture",
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Whole-word match that also accepts common endings: tests, fixing, migrated, boundaries. */
-function hasWord(text: string, word: string): boolean {
+export function hasWord(text: string, word: string): boolean {
   const parts = word.trim().split(/\s+/).map(escape);
   const last = parts[parts.length - 1];
   const head = parts.slice(0, -1);

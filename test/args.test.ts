@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { parseArgs } from "../src/cli/args.js";
 
+describe("--only", () => {
+  it("parses --only for run and explain, and rejects other values or combinations", () => {
+    expect(parseArgs(["run", "--only", "codex", "fix typo"])).toMatchObject({ name: "run", only: "codex", prompt: "fix typo" });
+    expect(parseArgs(["explain", "--only", "claude", "fix typo"])).toEqual({ name: "explain", prompt: "fix typo", only: "claude" });
+    expect(() => parseArgs(["run", "--only", "gemini", "x"])).toThrow(/--only/);
+    expect(() => parseArgs(["run", "--only"])).toThrow(/--only/);
+    expect(() => parseArgs(["run", "--only", "claude", "--team", "quick", "x"])).toThrow(/--only/);
+    expect(() => parseArgs(["run", "--only", "claude", "--auto", "x"])).toThrow(/--only/);
+  });
+});
+
 describe("parseArgs", () => {
   it("joins the words of a run prompt", () => {
     expect(parseArgs(["run", "fix", "the", "bug"])).toEqual({
