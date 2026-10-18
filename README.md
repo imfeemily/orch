@@ -1,5 +1,7 @@
 # claude-codex-orch
 
+![orch: one task, two coding agents](https://raw.githubusercontent.com/imfeemily/orch/main/docs/public/img/hero.jpg)
+
 A local daemon, CLI (`orch`) and MCP server that routes coding tasks to
 **Claude Code** or **Codex** and fails over to the other one when the first hits
 a rate limit or fails. Start from either tool; orch picks the agent, remembers
@@ -33,6 +35,12 @@ orch daemon stop                             # also required after editing confi
 
 The daemon starts on demand. State (cooldowns, last 50 jobs) lives in
 `~/.orch/state.json`; set `ORCH_HOME` to use another directory.
+
+### How it works
+
+![architecture](https://raw.githubusercontent.com/imfeemily/orch/main/docs/public/img/architecture.svg)
+
+Clients talk to one local daemon; the router picks the agent, model and tier; the runner starts the real `claude` or `codex` command. If an agent hits a limit, orch hands the task to the other one ([failover diagram](https://raw.githubusercontent.com/imfeemily/orch/main/docs/public/img/failover.svg), [roles diagram](https://raw.githubusercontent.com/imfeemily/orch/main/docs/public/img/roles.svg)).
 
 ### Call it from Claude Code and Codex (MCP)
 
